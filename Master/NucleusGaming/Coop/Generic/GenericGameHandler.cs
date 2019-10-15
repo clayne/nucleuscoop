@@ -213,7 +213,7 @@ namespace Nucleus.Gaming
                     {
                         try
                         {
-                            if (proc.ProcessName.ToLower() == Path.GetFileNameWithoutExtension(gen.ExecutableName.ToLower()) || attachedIds.Contains(proc.Id) || proc.MainWindowTitle == gen.Hook.ForceFocusWindowName)
+                            if (proc.ProcessName.ToLower() == Path.GetFileNameWithoutExtension(gen.ExecutableName.ToLower()) || attachedIds.Contains(proc.Id) || (gen.Hook.ForceFocusWindowName != "" && proc.MainWindowTitle == gen.Hook.ForceFocusWindowName))
                             {
                                 Log(string.Format("Killing process {0} (pid {1})", proc.ProcessName, proc.Id));
                                 proc.Kill();
@@ -530,7 +530,7 @@ namespace Nucleus.Gaming
                     Log(string.Format("Mutexes - Handle(s): ({0}), KillMutexDelay: {1}, KillMutexType: {2}, RenameNotKillMutex: {3}, PartialMutexSearch: {4}", mutexList, gen.KillMutexDelay, gen.KillMutexType, gen.RenameNotKillMutex, gen.PartialMutexSearch));
                 }
 
-                Log("NucleusCoop mod version: 0.9.7.1 ALPHA");
+                Log("NucleusCoop mod version: 0.9.7.2 ALPHA");
                 string pcSpecs = "PC Info - ";
                 var name = (from x in new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem").Get().Cast<ManagementObject>()
                             select x.GetPropertyValue("Caption")).FirstOrDefault();
