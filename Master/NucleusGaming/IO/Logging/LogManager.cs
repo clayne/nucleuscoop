@@ -63,7 +63,7 @@ namespace Nucleus.Gaming
         {
 #if ALPHA
             string local = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            return Path.Combine(local, "Data");
+            return Path.Combine(local, "content");
 #else
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             return Path.Combine(appData, "Nucleus Coop");
@@ -102,6 +102,10 @@ namespace Nucleus.Gaming
 
             if (ini.IniReadValue("Misc", "DebugLog") == "True")
             {
+                if(str.StartsWith("Found game info"))
+                {
+                    return;
+                }
                 using (StreamWriter writer = new StreamWriter("debug-log.txt", true))
                 {
                     writer.WriteLine($"[{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}]LOGMANAGER: {str}");

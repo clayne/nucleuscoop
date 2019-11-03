@@ -5,7 +5,7 @@ using System.IO;
 using System.Reflection;
 using Newtonsoft.Json;
 using System.Threading;
-using Ionic.Zip;
+//using Ionic.Zip;
 using Nucleus.Gaming.Properties;
 using Nucleus.Gaming.Coop;
 using System.Windows.Forms;
@@ -54,10 +54,10 @@ namespace Nucleus.Gaming
             games = new Dictionary<string, GenericGameInfo>();
             gameInfos = new Dictionary<string, GenericGameInfo>();
 
-            string appData = GetAppDataPath();
+            string appData = GetAppContentPath();
             Directory.CreateDirectory(appData);
 
-            string gameJs = GetJsGamesPath();
+            string gameJs = GetJsScriptsPath();
             Directory.CreateDirectory(gameJs);
 
             Initialize();
@@ -257,47 +257,47 @@ namespace Nucleus.Gaming
         /// Extracts the SmartSteamEmu and returns the folder its on
         /// </summary>
         /// <returns></returns>
-        public string ExtractSteamEmu(string outputFolder = null)
-        {
-            string steamEmu;
+        //public string ExtractSteamEmu(string outputFolder = null)
+        //{
+        //    string steamEmu;
 
-            if (string.IsNullOrEmpty(outputFolder))
-            {
-                string app = GetAppDataPath();
-                steamEmu = Path.Combine(app, "SteamEmu");
-            }
-            else
-            {
-                steamEmu = outputFolder;
-            }
+        //    if (string.IsNullOrEmpty(outputFolder))
+        //    {
+        //        string app = GetAppDataPath();
+        //        steamEmu = Path.Combine(app, "SteamEmu");
+        //    }
+        //    else
+        //    {
+        //        steamEmu = outputFolder;
+        //    }
 
-            try
-            {
-                //if (!Directory.Exists(steamEmu))
-                {
-                    LogManager.Log("Extracting SmartSteamEmu");
+        //    try
+        //    {
+        //        //if (!Directory.Exists(steamEmu))
+        //        //{
+        //        LogManager.Log("Extracting SmartSteamEmu");
 
-                    Directory.CreateDirectory(steamEmu);
-                    //using (MemoryStream stream = new MemoryStream(Resources.SmartSteamEmu))
-                    //{
-                        using (ZipFile zip1 = ZipFile.Read(Path.Combine(GetUtilsPath(), "SmartSteamEmu\\SmartSteamEmu.zip")))
-                        {
-                            foreach (ZipEntry e in zip1)
-                            {
-                                e.Extract(steamEmu, ExtractExistingFileAction.OverwriteSilently);
-                            }
-                        }
-                    //}
-                }
-            }
-            catch
-            {
-                LogManager.Log("Extraction of SmartSteamEmu failed");
-                return string.Empty;
-            }
+        //        Directory.CreateDirectory(steamEmu);
+        //        //using (MemoryStream stream = new MemoryStream(Resources.SmartSteamEmu))
+        //        //{
+        //        using (ZipFile zip1 = ZipFile.Read(Path.Combine(GetUtilsPath(), "SmartSteamEmu\\SmartSteamEmu.zip")))
+        //        {
+        //            foreach (ZipEntry e in zip1)
+        //            {
+        //                e.Extract(steamEmu, ExtractExistingFileAction.OverwriteSilently);
+        //            }
+        //        }
+        //        //}
+        //        //}
+        //    }
+        //    catch
+        //    {
+        //        LogManager.Log("Extraction of SmartSteamEmu failed");
+        //        return string.Empty;
+        //    }
 
-            return steamEmu;
-        }
+        //    return steamEmu;
+        //}
 
         public void WaitSave()
         {
@@ -308,21 +308,21 @@ namespace Nucleus.Gaming
 
         #region Initialize
 
-        public string GetAppDataPath()
+        public string GetAppContentPath()
         {
 #if ALPHA
             string local = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            return Path.Combine(local, "Data");
+            return Path.Combine(local, "content");
 #else
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             return Path.Combine(appData, "Nucleus Coop");
 #endif
         }
 
-        public string GetJsGamesPath()
+        public string GetJsScriptsPath()
         {
             string local = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            return Path.Combine(local, "games");
+            return Path.Combine(local, "scripts");
         }
 
         public string GetUtilsPath()
@@ -333,7 +333,7 @@ namespace Nucleus.Gaming
 
         public string GetUserProfilePath()
         {
-            return Path.Combine(GetAppDataPath(), "userprofile.json");
+            return Path.Combine(GetAppContentPath(), "userprofile.json");
         }
 
         public int Compare(UserGameInfo x, UserGameInfo y)
@@ -358,7 +358,7 @@ namespace Nucleus.Gaming
 
         public void BeginBackup(GenericGameInfo game)
         {
-            string appData = GetAppDataPath();
+            string appData = GetAppContentPath();
             string gamePath = Path.Combine(appData, game.GUID);
             Directory.CreateDirectory(gamePath);
 
@@ -372,13 +372,13 @@ namespace Nucleus.Gaming
 
         public string GempTempFolder(GenericGameInfo game)
         {
-            string appData = GetAppDataPath();
+            string appData = GetAppContentPath();
             return Path.Combine(appData, game.GUID);
         }
 
         public BackupFile BackupFile(GenericGameInfo game, string path)
         {
-            string appData = GetAppDataPath();
+            string appData = GetAppContentPath();
             string gamePath = Path.Combine(appData, game.GUID);
             string destination = Path.Combine(gamePath, Path.GetFileName(path));
 
@@ -413,7 +413,7 @@ namespace Nucleus.Gaming
                 return;
             }
 
-            string appData = GetAppDataPath();
+            string appData = GetAppContentPath();
             string gamePath = Path.Combine(appData, game.GUID);
 
             for (int i = 0; i < backupFiles.Count; i++)
@@ -424,6 +424,14 @@ namespace Nucleus.Gaming
                     File.Delete(bkp.Source);
                     File.Move(bkp.BackupPath, bkp.Source);
                 }
+            }
+        }
+
+        public void ReorderUserProfile()
+        {
+            lock (user.Games)
+            {
+                user.Games.Sort(Compare);
             }
         }
 
@@ -458,19 +466,20 @@ namespace Nucleus.Gaming
                                 // json doesn't save empty lists, and user didn't add any game
                                 user.InitializeDefault();
                             }
-                            else
-                            {
-                                // delete invalid games
-                                for (int i = 0; i < user.Games.Count; i++)
-                                {
-                                    UserGameInfo gameInfo = user.Games[i];
-                                    if (gameInfo.Game == null)
-                                    {
-                                        user.Games.RemoveAt(i);
-                                        i--;
-                                    }
-                                }
-                            }
+                            //else
+                            //{
+                            //    // delete invalid games
+                            //    for (int i = 0; i < user.Games.Count; i++)
+                            //    {
+                            //        UserGameInfo gameInfo = user.Games[i];
+                            //        if (gameInfo.Game == null)
+                            //        {
+                            //            LogManager.Log("Deleting invalid game " + user.Games[i].Game);
+                            //            user.Games.RemoveAt(i);
+                            //            i--;
+                            //        }
+                            //    }
+                            //}
                         }
                     }
                 }
@@ -537,7 +546,7 @@ namespace Nucleus.Gaming
         private void Initialize()
         {
             // Search for Javascript games-infos
-            string jsfolder = GetJsGamesPath();
+            string jsfolder = GetJsScriptsPath();
             DirectoryInfo jsFolder = new DirectoryInfo(jsfolder);
             FileInfo[] files = jsFolder.GetFiles("*.js");
             for (int i = 0; i < files.Length; i++)
@@ -555,15 +564,16 @@ namespace Nucleus.Gaming
                         LogManager.Log("Found game info: " + info.GameName);
                         games.Add(info.GUID, info);
                         //breaks anything? idk
-                        //gameInfos.Add(info.ExecutableName, info);
+                        gameInfos.Add(info.GUID, info);
                     }
                 }
                 catch
                 {
                     MessageBox.Show(string.Format("There is an error in the game script {0}. The game this script is for will not appear in the list. If the issue has been fixed, please try re-adding the game.\n\nCommon errors include:\n- A syntax error (such as a \',\' \';\' or \']\' missing)\n- Another script has this GUID (must be unique!)\n- Code is not in the right place or format (for example: methods using Context must be within the Game.Play function)", f.Name), "Error in script", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
-
+                
             }
+
         }
         #endregion
 
@@ -592,6 +602,7 @@ namespace Nucleus.Gaming
                 }
                 catch
                 {
+                    LogManager.Instance.LogExceptionFile(ex);
                     error = "We failed so hard we failed while trying to record the reason we failed initially. Sorry.";
                     return;
                 }
