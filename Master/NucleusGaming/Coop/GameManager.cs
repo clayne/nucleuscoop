@@ -9,6 +9,9 @@ using System.Threading;
 using Nucleus.Gaming.Properties;
 using Nucleus.Gaming.Coop;
 using System.Windows.Forms;
+using Nucleus.Gaming.Coop.BasicTypes;
+using System.Diagnostics;
+using Nucleus.Gaming.Coop.InputManagement;
 
 namespace Nucleus.Gaming
 {
@@ -20,6 +23,9 @@ namespace Nucleus.Gaming
     {
         private static GameManager instance;
 
+		public static Form mainForm;
+		public static IntPtr mainFormHandle;
+
         private Dictionary<string, GenericGameInfo> games;
         private Dictionary<string, GenericGameInfo> gameInfos;
         private UserProfile user;
@@ -27,8 +33,13 @@ namespace Nucleus.Gaming
         private string error;
         private bool isSaving;
 
-        /// object instance so we can thread-safe save the user profile
-        private object saving = new object();
+		private GameProfile currentProfile;
+
+		private RawInputProcessor rawInputProcessor;
+		private InputInterceptor inputInterceptor;
+
+		/// object instance so we can thread-safe save the user profile
+		private object saving = new object();
 
         public string Error { get { return error; } }
 
@@ -48,21 +59,42 @@ namespace Nucleus.Gaming
             set { user = value; }
         }
 
-        public GameManager()
+        public GameManager(Form mainForm)
         {
             instance = this;
             games = new Dictionary<string, GenericGameInfo>();
             gameInfos = new Dictionary<string, GenericGameInfo>();
 
-            string appData = GetAppContentPath();
+			GameManager.mainForm = mainForm;
+			GameManager.mainFormHandle = mainForm.Handle;
+
+			string appData = GetAppContentPath();
             Directory.CreateDirectory(appData);
 
             string gameJs = GetJsScriptsPath();
             Directory.CreateDirectory(gameJs);
 
-            Initialize();
+            inputInterceptor = new InputInterceptor();
+
+			//Subscribe to raw input
+			//TODO: update isRunningSplitScreen
+			Debug.WriteLine("Registering raw input");
+			rawInputProcessor = new RawInputProcessor(() => LockInput.IsLocked);//TODO: needs more robust method
+			//Action<IntPtr> rawInputAction = rawInputProcessor.Process;
+			//GameManager.mainForm.GetType().GetProperty("RawInputAction").SetValue(GameManager.mainForm, rawInputAction, new object[] { });
+			//IntPtr rawInputHwnd = GameManager.mainFormHandle;
+
+			RawInputManager.RegisterRawInput(rawInputProcessor);
+
+			Initialize();
             LoadUser();
         }
+
+		public void UpdateCurrentGameProfile(GameProfile newProfile)
+		{
+			currentProfile = newProfile;
+			RawInputProcessor.CurrentProfile = newProfile;
+		}
 
         /// <summary>
         /// Tests if there's any game with the named exe
@@ -562,18 +594,74 @@ namespace Nucleus.Gaming
                         GenericGameInfo info = new GenericGameInfo(f.Name, pathBlock, str);
 
                         LogManager.Log("Found game info: " + info.GameName);
+                        if (games.Any(c => c.Value.GUID == info.GUID))
+                        {
+                            games.Remove(info.GUID);
+                        }
                         games.Add(info.GUID, info);
-                        //breaks anything? idk
+
+                        if (gameInfos.Any(c => c.Value.GUID == info.GUID))
+                        {
+                            gameInfos.Remove(info.GUID);
+                        }
                         gameInfos.Add(info.GUID, info);
                     }
                 }
-                catch
+                catch (ArgumentNullException)
                 {
-                    MessageBox.Show(string.Format("There is an error in the game script {0}. The game this script is for will not appear in the list. If the issue has been fixed, please try re-adding the game.\n\nCommon errors include:\n- A syntax error (such as a \',\' \';\' or \']\' missing)\n- Another script has this GUID (must be unique!)\n- Code is not in the right place or format (for example: methods using Context must be within the Game.Play function)", f.Name), "Error in script", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    continue; // Issue with content of script, ignore this as error prompt is already displayed
                 }
-                
+                catch (ArgumentException ex)
+                {
+                    MessageBox.Show(ex.InnerException + ": " + ex.Message, "Error with script " + f.Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    continue;
+                }
+
             }
 
+        }
+
+
+        public void AddScript(string handlerName)
+        {
+            string jsfolder = GetJsScriptsPath();
+            DirectoryInfo jsFolder = new DirectoryInfo(jsfolder);
+
+            FileInfo f = new FileInfo(Path.Combine(jsFolder.FullName, handlerName + ".js"));
+            try
+            {
+                using (Stream str = f.OpenRead())
+                {
+                    string ext = Path.GetFileNameWithoutExtension(f.Name);
+                    string pathBlock = Path.Combine(f.Directory.FullName, ext);
+
+                    GenericGameInfo info = new GenericGameInfo(f.Name, pathBlock, str);
+
+                    LogManager.Log("Found game info: " + info.GameName);
+                    if (games.Any(c => c.Value.GUID == info.GUID))
+                    {
+                        games.Remove(info.GUID);
+                    }
+                    games.Add(info.GUID, info);
+
+                    if (gameInfos.Any(c => c.Value.GUID == info.GUID))
+                    {
+                        gameInfos.Remove(info.GUID);
+                    }
+                    gameInfos.Add(info.GUID, info);
+                }
+            }
+            catch (ArgumentNullException)
+            {
+                //continue; // Issue with content of script, ignore this as error prompt is already displayed
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(ex.InnerException + ": " + ex.Message, "Error with script " + f.Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                //continue;
+            }
+
+            
         }
         #endregion
 
@@ -587,7 +675,7 @@ namespace Nucleus.Gaming
 
         private void play(object state)
         {
-#if RELEASE
+#if RELEASE || true
             try
             {
                 error = ((IGameHandler)state).Play();

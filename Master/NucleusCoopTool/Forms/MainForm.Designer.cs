@@ -41,7 +41,13 @@
             this.openDataFolderToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.openOrigExePathToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem2 = new System.Windows.Forms.ToolStripSeparator();
+            this.openToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.deleteUserProfileConfigPathToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.openUserProfileSavePathToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.deleteUserProfileSavePathToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripMenuItem3 = new System.Windows.Forms.ToolStripSeparator();
             this.changeIconToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.deleteContentFolderToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.deleteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.btn_gameOptions = new System.Windows.Forms.Button();
             this.sideInfoLbl = new System.Windows.Forms.Label();
@@ -57,6 +63,7 @@
             this.scriptAuthorLbl = new System.Windows.Forms.Label();
             this.scriptAuthorTxt = new System.Windows.Forms.TextBox();
             this.lblVersion = new System.Windows.Forms.Label();
+            this.btn_Download = new System.Windows.Forms.Button();
             this.gameContextMenuStrip.SuspendLayout();
             this.StepPanel.SuspendLayout();
             this.SuspendLayout();
@@ -87,22 +94,28 @@
             this.openDataFolderToolStripMenuItem,
             this.openOrigExePathToolStripMenuItem,
             this.toolStripMenuItem2,
+            this.openToolStripMenuItem,
+            this.deleteUserProfileConfigPathToolStripMenuItem,
+            this.openUserProfileSavePathToolStripMenuItem,
+            this.deleteUserProfileSavePathToolStripMenuItem,
+            this.toolStripMenuItem3,
             this.changeIconToolStripMenuItem,
+            this.deleteContentFolderToolStripMenuItem,
             this.deleteToolStripMenuItem});
             this.gameContextMenuStrip.Name = "gameContextMenuStrip";
-            this.gameContextMenuStrip.Size = new System.Drawing.Size(186, 192);
+            this.gameContextMenuStrip.Size = new System.Drawing.Size(236, 308);
             this.gameContextMenuStrip.Opening += new System.ComponentModel.CancelEventHandler(this.GameContextMenuStrip_Opening);
             // 
             // nullToolStripMenuItem
             // 
             this.nullToolStripMenuItem.Name = "nullToolStripMenuItem";
-            this.nullToolStripMenuItem.Size = new System.Drawing.Size(185, 22);
+            this.nullToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
             this.nullToolStripMenuItem.Text = "null";
             // 
             // scriptNotesToolStripMenuItem
             // 
             this.scriptNotesToolStripMenuItem.Name = "scriptNotesToolStripMenuItem";
-            this.scriptNotesToolStripMenuItem.Size = new System.Drawing.Size(185, 22);
+            this.scriptNotesToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
             this.scriptNotesToolStripMenuItem.Text = "Script Author Notes";
             this.scriptNotesToolStripMenuItem.Visible = false;
             this.scriptNotesToolStripMenuItem.Click += new System.EventHandler(this.ScriptNotesToolStripMenuItem_Click);
@@ -110,53 +123,94 @@
             // toolStripMenuItem1
             // 
             this.toolStripMenuItem1.Name = "toolStripMenuItem1";
-            this.toolStripMenuItem1.Size = new System.Drawing.Size(182, 6);
+            this.toolStripMenuItem1.Size = new System.Drawing.Size(232, 6);
             // 
             // detailsToolStripMenuItem
             // 
             this.detailsToolStripMenuItem.Name = "detailsToolStripMenuItem";
-            this.detailsToolStripMenuItem.Size = new System.Drawing.Size(185, 22);
-            this.detailsToolStripMenuItem.Text = "Details";
+            this.detailsToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.detailsToolStripMenuItem.Text = "Nucleus Game Details";
             this.detailsToolStripMenuItem.Click += new System.EventHandler(this.DetailsToolStripMenuItem_Click);
             // 
             // openScriptToolStripMenuItem
             // 
             this.openScriptToolStripMenuItem.Name = "openScriptToolStripMenuItem";
-            this.openScriptToolStripMenuItem.Size = new System.Drawing.Size(185, 22);
-            this.openScriptToolStripMenuItem.Text = "Open Script";
+            this.openScriptToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.openScriptToolStripMenuItem.Text = "Open Game Script";
             this.openScriptToolStripMenuItem.Click += new System.EventHandler(this.OpenScriptToolStripMenuItem_Click);
             // 
             // openDataFolderToolStripMenuItem
             // 
             this.openDataFolderToolStripMenuItem.Name = "openDataFolderToolStripMenuItem";
-            this.openDataFolderToolStripMenuItem.Size = new System.Drawing.Size(185, 22);
-            this.openDataFolderToolStripMenuItem.Text = "Open Content Folder";
+            this.openDataFolderToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.openDataFolderToolStripMenuItem.Text = "Open Nucleus Content Folder";
             this.openDataFolderToolStripMenuItem.Click += new System.EventHandler(this.OpenDataFolderToolStripMenuItem_Click);
             // 
             // openOrigExePathToolStripMenuItem
             // 
             this.openOrigExePathToolStripMenuItem.Name = "openOrigExePathToolStripMenuItem";
-            this.openOrigExePathToolStripMenuItem.Size = new System.Drawing.Size(185, 22);
-            this.openOrigExePathToolStripMenuItem.Text = "Open Orig Exe Path";
+            this.openOrigExePathToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.openOrigExePathToolStripMenuItem.Text = "Open Original Exe Path";
             this.openOrigExePathToolStripMenuItem.Click += new System.EventHandler(this.OpenOrigExePathToolStripMenuItem_Click);
             // 
             // toolStripMenuItem2
             // 
             this.toolStripMenuItem2.Name = "toolStripMenuItem2";
-            this.toolStripMenuItem2.Size = new System.Drawing.Size(182, 6);
+            this.toolStripMenuItem2.Size = new System.Drawing.Size(232, 6);
+            this.toolStripMenuItem2.Visible = false;
+            // 
+            // openToolStripMenuItem
+            // 
+            this.openToolStripMenuItem.Name = "openToolStripMenuItem";
+            this.openToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.openToolStripMenuItem.Text = "Open UserProfile Config Path";
+            this.openToolStripMenuItem.Visible = false;
+            // 
+            // deleteUserProfileConfigPathToolStripMenuItem
+            // 
+            this.deleteUserProfileConfigPathToolStripMenuItem.Name = "deleteUserProfileConfigPathToolStripMenuItem";
+            this.deleteUserProfileConfigPathToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.deleteUserProfileConfigPathToolStripMenuItem.Text = "Delete UserProfile Config Path";
+            this.deleteUserProfileConfigPathToolStripMenuItem.Visible = false;
+            // 
+            // openUserProfileSavePathToolStripMenuItem
+            // 
+            this.openUserProfileSavePathToolStripMenuItem.Name = "openUserProfileSavePathToolStripMenuItem";
+            this.openUserProfileSavePathToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.openUserProfileSavePathToolStripMenuItem.Text = "Open UserProfile Save Path";
+            this.openUserProfileSavePathToolStripMenuItem.Visible = false;
+            // 
+            // deleteUserProfileSavePathToolStripMenuItem
+            // 
+            this.deleteUserProfileSavePathToolStripMenuItem.Name = "deleteUserProfileSavePathToolStripMenuItem";
+            this.deleteUserProfileSavePathToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.deleteUserProfileSavePathToolStripMenuItem.Text = "Delete UserProfile Save Path";
+            this.deleteUserProfileSavePathToolStripMenuItem.Visible = false;
+            // 
+            // toolStripMenuItem3
+            // 
+            this.toolStripMenuItem3.Name = "toolStripMenuItem3";
+            this.toolStripMenuItem3.Size = new System.Drawing.Size(232, 6);
             // 
             // changeIconToolStripMenuItem
             // 
             this.changeIconToolStripMenuItem.Name = "changeIconToolStripMenuItem";
-            this.changeIconToolStripMenuItem.Size = new System.Drawing.Size(185, 22);
-            this.changeIconToolStripMenuItem.Text = "Change Icon";
+            this.changeIconToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.changeIconToolStripMenuItem.Text = "Change Game Icon";
             this.changeIconToolStripMenuItem.Click += new System.EventHandler(this.ChangeIconToolStripMenuItem_Click);
+            // 
+            // deleteContentFolderToolStripMenuItem
+            // 
+            this.deleteContentFolderToolStripMenuItem.Name = "deleteContentFolderToolStripMenuItem";
+            this.deleteContentFolderToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.deleteContentFolderToolStripMenuItem.Text = "Delete Nucleus Content Folder";
+            this.deleteContentFolderToolStripMenuItem.Click += new System.EventHandler(this.deleteContentFolderToolStripMenuItem_Click);
             // 
             // deleteToolStripMenuItem
             // 
             this.deleteToolStripMenuItem.Name = "deleteToolStripMenuItem";
-            this.deleteToolStripMenuItem.Size = new System.Drawing.Size(185, 22);
-            this.deleteToolStripMenuItem.Text = "Delete";
+            this.deleteToolStripMenuItem.Size = new System.Drawing.Size(235, 22);
+            this.deleteToolStripMenuItem.Text = "Remove Game from List";
             this.deleteToolStripMenuItem.Click += new System.EventHandler(this.DeleteToolStripMenuItem_Click);
             // 
             // btn_gameOptions
@@ -170,13 +224,13 @@
             this.btn_gameOptions.Text = "Game\r\nOptions";
             this.btn_gameOptions.UseVisualStyleBackColor = true;
             this.btn_gameOptions.Visible = false;
-            this.btn_gameOptions.Click += new System.EventHandler(this.Button1_Click);
+            this.btn_gameOptions.Click += new System.EventHandler(this.GameOptions_Click);
             // 
             // sideInfoLbl
             // 
             this.sideInfoLbl.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.sideInfoLbl.AutoSize = true;
-            this.sideInfoLbl.Location = new System.Drawing.Point(845, 10);
+            this.sideInfoLbl.Location = new System.Drawing.Point(899, 10);
             this.sideInfoLbl.Name = "sideInfoLbl";
             this.sideInfoLbl.Size = new System.Drawing.Size(0, 21);
             this.sideInfoLbl.TabIndex = 14;
@@ -279,7 +333,7 @@
             this.list_Games.Location = new System.Drawing.Point(12, 12);
             this.list_Games.Name = "list_Games";
             this.list_Games.Offset = new System.Drawing.Size(0, 2);
-            this.list_Games.Size = new System.Drawing.Size(262, 636);
+            this.list_Games.Size = new System.Drawing.Size(262, 595);
             this.list_Games.TabIndex = 2;
             this.list_Games.SelectedChanged += new System.Action<object, System.Windows.Forms.Control>(this.list_Games_SelectedChanged);
             // 
@@ -337,11 +391,24 @@
             this.lblVersion.TabIndex = 12;
             this.lblVersion.Text = "ALPHA 8";
             // 
+            // btn_Download
+            // 
+            this.btn_Download.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.btn_Download.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btn_Download.Location = new System.Drawing.Point(12, 613);
+            this.btn_Download.Name = "btn_Download";
+            this.btn_Download.Size = new System.Drawing.Size(262, 35);
+            this.btn_Download.TabIndex = 22;
+            this.btn_Download.Text = "Download Game Scripts";
+            this.btn_Download.UseVisualStyleBackColor = true;
+            this.btn_Download.Click += new System.EventHandler(this.btn_Download_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
             this.ClientSize = new System.Drawing.Size(1058, 701);
+            this.Controls.Add(this.btn_Download);
             this.Controls.Add(this.btn_gameOptions);
             this.Controls.Add(this.settingsBtn);
             this.Controls.Add(this.sideInfoLbl);
@@ -396,5 +463,12 @@
         private System.Windows.Forms.Label scriptAuthorLbl;
         private System.Windows.Forms.TextBox scriptAuthorTxt;
         private System.Windows.Forms.ToolStripMenuItem openOrigExePathToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem deleteContentFolderToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem openToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem deleteUserProfileConfigPathToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem openUserProfileSavePathToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem deleteUserProfileSavePathToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator toolStripMenuItem3;
+        private System.Windows.Forms.Button btn_Download;
     }
 }

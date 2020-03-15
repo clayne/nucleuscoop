@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -9,13 +9,14 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Nucleus.Coop</RootNamespace>
     <AssemblyName>NucleusCoop</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SccProjectName>SAK</SccProjectName>
     <SccLocalPath>SAK</SccLocalPath>
     <SccAuxPath>SAK</SccAuxPath>
     <SccProvider>SAK</SccProvider>
-    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
@@ -36,27 +37,6 @@
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>x86</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;ALPHA</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>x86</PlatformTarget>
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE;ALPHA</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
@@ -69,12 +49,40 @@
   <PropertyGroup>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;ALPHA</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;ALPHA</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'TestDebug|AnyCPU'">
     <OutputPath>bin\TestDebug\</OutputPath>
     <DefineConstants>TRACE;DEBUG;TEST</DefineConstants>
-    <Prefer32Bit>false</Prefer32Bit>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="DotNetZip, Version=1.13.5.0, Culture=neutral, PublicKeyToken=6583c7c814667745, processorArchitecture=MSIL">
+      <HintPath>..\packages\DotNetZip.1.13.5\lib\net40\DotNetZip.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.3\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
@@ -100,17 +108,36 @@
     <Compile Include="Forms\BaseForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Forms\DownloadPrompt.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\DownloadPrompt.Designer.cs">
+      <DependentUpon>DownloadPrompt.cs</DependentUpon>
+    </Compile>
     <Compile Include="Forms\GameList.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\GameList.Designer.cs">
       <DependentUpon>GameList.cs</DependentUpon>
     </Compile>
+    <Compile Include="Forms\Handler.cs" />
+    <Compile Include="Forms\HandlerInfo.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\HandlerInfo.Designer.cs">
+      <DependentUpon>HandlerInfo.cs</DependentUpon>
+    </Compile>
     <Compile Include="Forms\MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\MainForm.Designer.cs">
       <DependentUpon>MainForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ScriptDownloader.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ScriptDownloader.Designer.cs">
+      <DependentUpon>ScriptDownloader.cs</DependentUpon>
     </Compile>
     <Compile Include="Forms\SearchDisksForm.cs">
       <SubType>Form</SubType>
@@ -129,11 +156,20 @@
     <EmbeddedResource Include="Forms\BaseForm.resx">
       <DependentUpon>BaseForm.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Forms\DownloadPrompt.resx">
+      <DependentUpon>DownloadPrompt.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\GameList.resx">
       <DependentUpon>GameList.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Forms\HandlerInfo.resx">
+      <DependentUpon>HandlerInfo.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\MainForm.resx">
       <DependentUpon>MainForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ScriptDownloader.resx">
+      <DependentUpon>ScriptDownloader.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\SearchDisksForm.resx">
       <DependentUpon>SearchDisksForm.cs</DependentUpon>
@@ -154,6 +190,29 @@
     <None Include="app.manifest">
       <SubType>Designer</SubType>
     </None>
+    <None Include="copyoutput\Settings.ini" />
+    <None Include="copyoutput\utils\FlawlessWidescreen\x64\data\about_track.xm" />
+    <None Include="copyoutput\utils\FlawlessWidescreen\x64\PluginCache\FWS_Plugins\GlobalDependencies\Scripts\StandardBase.lua" />
+    <None Include="copyoutput\utils\FlawlessWidescreen\x64\PluginCache\FWS_Plugins\GlobalDependencies\Scripts\StandardTheme.lua" />
+    <None Include="copyoutput\utils\FlawlessWidescreen\x64\Plugins\FWS_Plugins.fws" />
+    <None Include="copyoutput\utils\FlawlessWidescreen\x86\data\about_track.xm" />
+    <None Include="copyoutput\utils\GoldbergEmu\experimental_steamclient\ColdClientLoader.ini" />
+    <None Include="copyoutput\utils\GoldbergEmu\job_id" />
+    <None Include="copyoutput\utils\GoldbergEmu\linux\lobby_connect\lobby_connect_x64" />
+    <None Include="copyoutput\utils\GoldbergEmu\linux\lobby_connect\lobby_connect_x86" />
+    <None Include="copyoutput\utils\GoldbergEmu\linux\tools\find_interfaces.sh" />
+    <None Include="copyoutput\utils\GoldbergEmu\linux\tools\steamclient_loader.sh" />
+    <None Include="copyoutput\utils\GoldbergEmu\linux\x86\libsteam_api.so" />
+    <None Include="copyoutput\utils\GoldbergEmu\linux\x86\steamclient.so" />
+    <None Include="copyoutput\utils\GoldbergEmu\linux\x86_64\libsteam_api.so" />
+    <None Include="copyoutput\utils\GoldbergEmu\linux\x86_64\steamclient.so" />
+    <None Include="copyoutput\utils\GoldbergEmu\source_code\source_code.bundle" />
+    <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\achievements_EXAMPLE.json" />
+    <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\default_items.EXAMPLE.json" />
+    <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\items.EXAMPLE.json" />
+    <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\mods.EXAMPLE\12345\mod_file1" />
+    <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\mods.EXAMPLE\12345\mod_file2" />
+    <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\mods.EXAMPLE\12345\random_mod_file" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -165,6 +224,23 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <None Include="SplitKey.snk" />
+    <None Include="copyoutput\utils\devreorder\devreorder.ini" />
+    <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu.ini" />
+    <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Common\218620\inventory.bin" />
+    <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Common\218620\item_schema.bin" />
+    <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Common\620\items.bin" />
+    <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Common\730\items.bin" />
+    <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Plugins\SSEFirewall.ini" />
+    <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Plugins\SSEOverlay\Language.ini" />
+    <None Include="copyoutput\utils\x360ce\x360ce.ini" />
+    <None Include="copyoutput\utils\XInputPlus\x64\Dinput.dl_" />
+    <None Include="copyoutput\utils\XInputPlus\x64\Dinput8.dl_" />
+    <None Include="copyoutput\utils\XInputPlus\x64\xinput1_3.dl_" />
+    <None Include="copyoutput\utils\XInputPlus\x86\Dinput.dl_" />
+    <None Include="copyoutput\utils\XInputPlus\x86\Dinput8.dl_" />
+    <None Include="copyoutput\utils\XInputPlus\x86\xinput1_3.dl_" />
+    <None Include="copyoutput\utils\XInputPlus\XInputPlus.ini" />
+    <None Include="copyoutput\utils\XInputPlus\XInputPlus_Default.ini" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -260,11 +336,184 @@
     <None Include="Resources\not_found_white.png" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="copyoutput\utils\Credits.txt" />
+    <Content Include="copyoutput\utils\Custom utils go in User folder.txt" />
+    <Content Include="copyoutput\utils\devreorder\DeviceLister.exe" />
+    <Content Include="copyoutput\utils\devreorder\x64\dinput8.dll" />
+    <Content Include="copyoutput\utils\devreorder\x86\dinput8.dll" />
+    <Content Include="copyoutput\utils\DirectXWrapper\d3d9.dll" />
+    <Content Include="copyoutput\utils\Do NOT change file or folder names.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\bass.dll" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\BeaEngine.dll" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\about_1.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\about_2.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\about_3.jpg" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\b-execstep.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\b-nextstep.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\b-prevstep.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\donate_button.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\largeicon_default.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\Logo.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\lv-critical.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\lv-debug.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\lv-error.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\lv-information.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\lv-warning.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\tc-status.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\tv-avail.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\tv-downloading.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\tv-installed.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\tv-missingdep.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\tv-module.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\tv-plugin.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\FASM.dll" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\fasm_wrapper.exe" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\FlawlessWidescreen.exe" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\libcurl.dll" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\licences\BeaEngine.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\licences\FASM.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\licences\FlawlessWidescreen.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\licences\libcurl.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\licences\Summary.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\RepositoryCache\FWS_MasterRepo.xml" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x64\settings.xml" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\bass.dll" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\BeaEngine.dll" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\about_1.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\about_2.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\about_3.jpg" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\b-execstep.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\b-nextstep.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\b-prevstep.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\donate_button.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\largeicon_default.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\Logo.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\lv-critical.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\lv-debug.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\lv-error.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\lv-information.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\lv-warning.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\tc-status.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\tv-avail.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\tv-downloading.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\tv-installed.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\tv-missingdep.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\tv-module.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\data\tv-plugin.png" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\FASM.dll" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\FlawlessWidescreen.exe" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\libcurl.dll" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\licences\BeaEngine.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\licences\FASM.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\licences\FlawlessWidescreen.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\licences\libcurl.txt" />
+    <Content Include="copyoutput\utils\FlawlessWidescreen\x86\licences\Summary.txt" />
+    <Content Include="copyoutput\utils\ForceBindIP\BindIP.dll" />
+    <Content Include="copyoutput\utils\ForceBindIP\BindIP64.dll" />
+    <Content Include="copyoutput\utils\ForceBindIP\ForceBindIP.exe" />
+    <Content Include="copyoutput\utils\ForceBindIP\ForceBindIP64.exe" />
+    <Content Include="copyoutput\utils\GoldbergEmu\debug_experimental\Readme.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\debug_experimental\steam_api.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\debug_experimental\steam_api64.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\debug_experimental_steamclient\steamclient.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\debug_experimental_steamclient\steamclient64.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental\Readme.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental\steamclient.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental\steamclient64.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental\steam_api.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental\steam_api64.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental_steamclient\Readme.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental_steamclient\steamclient.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental_steamclient\steamclient64.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\experimental_steamclient\steamclient_loader.exe" />
+    <Content Include="copyoutput\utils\GoldbergEmu\lobby_connect\lobby_connect.exe" />
+    <Content Include="copyoutput\utils\GoldbergEmu\lobby_connect\Readme.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\Readme.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\settings\account_name.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\settings\user_steam_id.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\source_code\Readme.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_api.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_api64.dll" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_appid.EDIT_AND_RENAME.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_interfaces.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\app_paths.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\button_a.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\button_b.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\button_x.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\button_y.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\shoulder_l.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\shoulder_r.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\stick_dpad_e.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\stick_dpad_n.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\stick_dpad_s.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\stick_dpad_w.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\stick_l_click.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\stick_l_move.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\stick_r_click.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\stick_r_move.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\trigger_l_click.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\trigger_l_pull.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\trigger_r_click.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\trigger_r_pull.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\xbox_button_dpad_e.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\xbox_button_dpad_move.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\xbox_button_dpad_n.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\xbox_button_dpad_s.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\xbox_button_dpad_w.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\xbox_button_select.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\glyphs\xbox_button_start.png" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\InGameControls.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\controller.EXAMPLE\MenuControls.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\custom_broadcasts.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\depots.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\disable_networking.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\disable_overlay.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\DLC.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\leaderboards.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\mods.EXAMPLE\12345\Readme.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\offline.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\stats.EXAMPLE.txt" />
+    <Content Include="copyoutput\utils\GoldbergEmu\tools\generate_interfaces_file.exe" />
+    <Content Include="copyoutput\utils\GoldbergEmu\tools\Readme_generate_interfaces.txt" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu.dll" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu.txt" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu64.dll" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Common\avatar.png" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Common\Readme.txt" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Plugins\SSEFirewall.dll" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Plugins\SSEFirewall64.dll" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Plugins\SSEOverlay\message.wav" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Plugins\SSEOverlay\screenshot.wav" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Plugins\x64\SSEOverlay.dll" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Plugins\x86\SSEOverlay.dll" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamLoader.exe" />
+    <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamLoader_x64.exe" />
+    <Content Include="copyoutput\utils\Steam Stub DRM Patcher\x64\winmm.dll" />
+    <Content Include="copyoutput\utils\Steam Stub DRM Patcher\x86\winmm.dll" />
+    <Content Include="copyoutput\utils\x360ce\dinput8.dll" />
+    <Content Include="copyoutput\utils\x360ce\dinput8_x64.dll" />
+    <Content Include="copyoutput\utils\x360ce\x360ce.exe" />
+    <Content Include="copyoutput\utils\x360ce\x360ce_x64.exe" />
+    <Content Include="copyoutput\utils\x360ce\xinput1_3.dll" />
+    <Content Include="copyoutput\utils\x360ce\xinput1_3_x64.dll" />
+    <Content Include="copyoutput\utils\XInputPlus\DI8dotNET.dll" />
+    <Content Include="copyoutput\utils\XInputPlus\ja\XInputPlus.resources.dll" />
+    <Content Include="copyoutput\utils\XInputPlus\Loader\ja\XInputPlusLoader.resources.dll" />
+    <Content Include="copyoutput\utils\XInputPlus\Loader\XInputPlusInjector.dll" />
+    <Content Include="copyoutput\utils\XInputPlus\Loader\XInputPlusInjector64.dll" />
+    <Content Include="copyoutput\utils\XInputPlus\Loader\XInputPlusLoader.exe" />
+    <Content Include="copyoutput\utils\XInputPlus\ReadMe_en.txt" />
+    <Content Include="copyoutput\utils\XInputPlus\XInputPlus.exe" />
+    <Content Include="copyoutput\utils\XInputPlus\ìXÉVùÜù=.txt" />
+    <Content Include="copyoutput\utils\XInputPlus\òKé+é¿ô¦é¦é¡é+é¦éó.txt" />
     <None Include="Resources\setting.png" />
     <Content Include="icon.ico" />
     <Content Include="Resources\icon.ico" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="copyoutput\utils\FlawlessWidescreen\x64\PluginCache\FWS_Plugins\Modules\" />
+    <Folder Include="copyoutput\utils\User\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -274,7 +523,10 @@
   </Target>
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <PropertyGroup>
-    <PostBuildEvent>echo.&gt;Built.flag</PostBuildEvent>
+    <PostBuildEvent>echo.&gt;Built.flag
+copy $(SolutionDir)ThirdParty\easyhook\*.dll $(TargetPath)\..
+copy $(SolutionDir)ThirdParty\easyhook\*.exe $(TargetPath)\..
+xcopy $(ProjectDir)copyoutput $(TargetPath)\.. /s/h/e/k/f/c/Y</PostBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
     <PreBuildEvent>

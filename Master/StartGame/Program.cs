@@ -1,26 +1,39 @@
 ﻿using Nucleus;
 using Nucleus.Gaming;
 using Nucleus.Gaming.Windows;
-using Nucleus.Interop.User32;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using EasyHook;
 using System.Runtime.InteropServices;
-using Nucleus.Gaming.Coop;
-using System.Security;
+using System.Collections;
+using System.Linq;
+using System.Windows.Forms;
 
 namespace StartGame
 {
+
+    internal static class Extensions
+    {
+        [DllImport("Kernel32.dll")]
+        private static extern bool QueryFullProcessImageName([In] IntPtr hProcess, [In] uint dwFlags, [Out] StringBuilder lpExeName, [In, Out] ref uint lpdwSize);
+
+        public static string GetMainModuleFileName(this Process process, int buffer = 1024)
+        {
+            var fileNameBuilder = new StringBuilder(buffer);
+            uint bufferLength = (uint)fileNameBuilder.Capacity + 1;
+            return QueryFullProcessImageName(process.Handle, 0, fileNameBuilder, ref bufferLength) ?
+                fileNameBuilder.ToString() :
+                null;
+        }
+    }
+
     class Program
     {
-        private static int tries = 5;
+        private const int tries = 2;
+        private static int tri = 0;
         private static Process proc;
         private static string mt;
         private static bool partialMutex;
@@ -30,6 +43,8 @@ namespace StartGame
         private static bool renameMutex;
         private static bool setWindow;
         private static bool blockRaw;
+        private static bool createSingle;
+        private static string rawHid;
         //private static bool runAdmin;
 
         private static string root;
@@ -41,8 +56,12 @@ namespace StartGame
         private static bool hardLink;
         private static bool symFolders;
         private static int numPlayers;
+        private static string playerNick;
+        private static bool useNucleusEnvironment;
+        private static bool injectFailed;
+        private static bool useStartupHooks = true;
 
-        private static bool gameIs64 = false;
+        //private static bool gameIs64 = false;
 
         private static string mutexToRename;
 
@@ -51,7 +70,7 @@ namespace StartGame
         private static bool isDebug;
         private static string nucleusFolderPath;
 
-        private static int pOutPID = 0;
+        private static uint pOutPID = 0;
 
         private static readonly IniFile ini = new Nucleus.Gaming.IniFile(Path.Combine(Directory.GetCurrentDirectory(), "Settings.ini"));
 
@@ -68,50 +87,60 @@ namespace StartGame
             IntPtr OutProcessId //Pointer to a UINT (the PID of the new process)
             );
 
-        [DllImport("kernel32.dll")]
-        public static extern bool CreateProcess(string lpApplicationName,
-        string lpCommandLine, IntPtr lpProcessAttributes,
-        IntPtr lpThreadAttributes,
-        bool bInheritHandles, ProcessCreationFlags dwCreationFlags,
-        IntPtr lpEnvironment, string lpCurrentDirectory,
-        ref STARTUPINFO lpStartupInfo,
-        out PROCESS_INFORMATION lpProcessInformation);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+        static extern bool CreateProcess(
+            string lpApplicationName,
+            string lpCommandLine,
+            //ref SECURITY_ATTRIBUTES lpProcessAttributes,
+            //ref SECURITY_ATTRIBUTES lpThreadAttributes,
+            IntPtr lpProcessAttributes,
+            IntPtr lpThreadAttributes,
+            bool bInheritHandles,
+            uint dwCreationFlags,
+            IntPtr lpEnvironment,
+            string lpCurrentDirectory,
+            //IntPtr lpStartupInfo,
+            [In] ref STARTUPINFO lpStartupInfo,
+            out PROCESS_INFORMATION lpProcessInformation);
 
-        [DllImport("kernel32.dll")]
-        public static extern uint ResumeThread(IntPtr hThread);
-
-        [DllImport("kernel32.dll")]
-        public static extern uint SuspendThread(IntPtr hThread);
-
-        public struct STARTUPINFO
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct STARTUPINFO
         {
-            public uint cb;
+            public Int32 cb;
             public string lpReserved;
             public string lpDesktop;
             public string lpTitle;
-            public uint dwX;
-            public uint dwY;
-            public uint dwXSize;
-            public uint dwYSize;
-            public uint dwXCountChars;
-            public uint dwYCountChars;
-            public uint dwFillAttribute;
-            public uint dwFlags;
-            public short wShowWindow;
-            public short cbReserved2;
+            public Int32 dwX;
+            public Int32 dwY;
+            public Int32 dwXSize;
+            public Int32 dwYSize;
+            public Int32 dwXCountChars;
+            public Int32 dwYCountChars;
+            public Int32 dwFillAttribute;
+            public Int32 dwFlags;
+            public Int16 wShowWindow;
+            public Int16 cbReserved2;
             public IntPtr lpReserved2;
             public IntPtr hStdInput;
             public IntPtr hStdOutput;
             public IntPtr hStdError;
         }
 
-        public struct PROCESS_INFORMATION
+        [StructLayout(LayoutKind.Sequential)]
+        struct PROCESS_INFORMATION
         {
             public IntPtr hProcess;
             public IntPtr hThread;
-            public uint dwProcessId;
-            public uint dwThreadId;
+            public int dwProcessId;
+            public int dwThreadId;
         }
+
+        [DllImport("kernel32.dll")]
+        static extern uint ResumeThread(IntPtr hThread);
+
+        [DllImport("kernel32.dll")]
+        static extern int SuspendThread(IntPtr hThread);
+
 
         public enum ProcessCreationFlags : uint
         {
@@ -223,283 +252,301 @@ namespace StartGame
                 path = Path.Combine(root, path);
             }
 
-            int tri = 0;
-            ProcessStartInfo startInfo;
-            startInfo = new ProcessStartInfo();
-            startInfo.FileName = path;
-            startInfo.Arguments = args;
-            
-            if (!string.IsNullOrWhiteSpace(workingDir))
-            {
-                startInfo.WorkingDirectory = workingDir;
-            }
-
-
             try
             {
                 //proc = Process.Start(startInfo);
-                string currDir = Directory.GetCurrentDirectory();
+                //string currDir = Directory.GetCurrentDirectory();
+
+				// This works even if the current directory is set elsewhere.
+                string currDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 
                 //bool is64 = EasyHook.RemoteHooking.IsX64Process((int)pi.dwProcessId);
-                if (Is64Bit(path) == true)
+                //if (Is64Bit(path) == true)
+                //{
+                //    gameIs64 = true;
+                //}
+                //bool is64 = EasyHook.RemoteHooking.IsX64Process((int)pi.dwProcessId);
+
+                IntPtr envPtr = IntPtr.Zero;
+                uint pCreationFlags = 0;
+
+                if (useNucleusEnvironment)
                 {
-                    gameIs64 = true;
+                    Log("Setting up Nucleus environment");
+                    var sb = new StringBuilder();
+                    IDictionary envVars = Environment.GetEnvironmentVariables();
+                    var username = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).Replace(@"C:\Users\", "");
+                    envVars["USERPROFILE"] = $@"C:\Users\{username}\NucleusCoop\{playerNick}";
+                    envVars["HOMEPATH"] = $@"\Users\{username}\NucleusCoop\{playerNick}";
+                    envVars["APPDATA"] = $@"C:\Users\{username}\NucleusCoop\{playerNick}\AppData\Roaming";
+                    envVars["LOCALAPPDATA"] = $@"C:\Users\{username}\NucleusCoop\{playerNick}\AppData\Local";
+
+                    //Some games will crash if the directories don't exist
+                    Directory.CreateDirectory($@"C:\Users\{username}\NucleusCoop");
+                    Directory.CreateDirectory(envVars["USERPROFILE"].ToString());
+                    Directory.CreateDirectory(Path.Combine(envVars["USERPROFILE"].ToString(), "Documents"));
+                    Directory.CreateDirectory(envVars["APPDATA"].ToString());
+                    Directory.CreateDirectory(envVars["LOCALAPPDATA"].ToString());
+
+                    foreach (object envVarKey in envVars.Keys)
+                    {
+                        if (envVarKey != null)
+                        {
+                            string key = envVarKey.ToString();
+                            string value = envVars[envVarKey].ToString();
+
+                            sb.Append(key);
+                            sb.Append("=");
+                            sb.Append(value);
+                            sb.Append("\0");
+                        }
+                    }
+
+                    sb.Append("\0");
+
+                    byte[] envBytes = Encoding.Unicode.GetBytes(sb.ToString());
+                    envPtr = Marshal.AllocHGlobal(envBytes.Length);
+                    Marshal.Copy(envBytes, 0, envPtr, envBytes.Length);
+
+                    pCreationFlags += (uint)ProcessCreationFlags.CREATE_UNICODE_ENVIRONMENT;
                 }
 
-                if (isHook || renameMutex || setWindow || blockRaw)
+                STARTUPINFO startup = new STARTUPINFO();
+                startup.cb = Marshal.SizeOf(startup);
+
+                if (useStartupHooks && (isHook || renameMutex || setWindow || blockRaw || createSingle))
                 {
-                    var targetsBytes = Encoding.Unicode.GetBytes(mutexToRename);
-                    int targetsBytesLength = targetsBytes.Length;
+                    Log("Starting game and injecting start up hooks via Nucleus.Inject");
 
-                    var logPath = Encoding.Unicode.GetBytes(nucleusFolderPath);
-                    int logPathLength = logPath.Length;
+                    bool? is64_n = Is64Bit(path);
 
-                    //var hidBytes = Encoding.Unicode.GetBytes(rawHid);
-                    //int hidBytesLength = hidBytes.Length;
+					if (!is64_n.HasValue)
+					{
+						Log(string.Format("ERROR - Machine type {0} not implemented", GetDllMachineType(path)));
+						return;
+					}
 
-                    int size = 27 + logPathLength + targetsBytesLength;
-                    var data = new byte[size];
-                    data[0] = isHook == true ? (byte)1 : (byte)0;
-                    data[1] = renameMutex == true ? (byte)1 : (byte)0;
-                    data[2] = setWindow == true ? (byte)1 : (byte)0;
-                    data[3] = isDebug == true ? (byte)1 : (byte)0;
-                    data[4] = blockRaw == true ? (byte)1 : (byte)0;
+					bool is64 = is64_n.Value;
 
-                    data[10] = (byte)(logPathLength >> 24);
-                    data[11] = (byte)(logPathLength >> 16);
-                    data[12] = (byte)(logPathLength >> 8);
-                    data[13] = (byte)logPathLength;
+                    //PROCESS_INFORMATION procInfo = new PROCESS_INFORMATION();
 
-                    data[14] = (byte)(targetsBytesLength >> 24);
-                    data[15] = (byte)(targetsBytesLength >> 16);
-                    data[16] = (byte)(targetsBytesLength >> 8);
-                    data[17] = (byte)targetsBytesLength;
-
-                    //data[18] = (byte)(hidBytesLength >> 24);
-                    //data[19] = (byte)(hidBytesLength >> 16);
-                    //data[20] = (byte)(hidBytesLength >> 8);
-                    //data[21] = (byte)hidBytesLength;
-
-                    Array.Copy(logPath, 0, data, 18, logPathLength);
-
-                    //Array.Copy(hidBytes, 0, data, 23 + logPathLength, hidBytesLength);
-
-                    Array.Copy(targetsBytes, 0, data, 19 + logPathLength, targetsBytesLength);
-
-                    IntPtr ptr = Marshal.AllocHGlobal(size);
-                    Marshal.Copy(data, 0, ptr, size);
-
-                    if (!isDelay) // CreateandInject method
+                    Process[] gameProcs = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(path));
+                    bool alreadyExists = false;
+                    if (gameProcs.Length > 0)
                     {
-                        Log("Starting game and injecting start up hooks using create and inject method");
-                        if (gameIs64)
+                        foreach (Process gameProc in gameProcs)
                         {
-                            try
+                            if (gameProc.GetMainModuleFileName().ToLower() == path.ToLower())
                             {
-                                Log("x64 game detected, injecting Nucleus.SHook64.dll");
-                                IntPtr pid = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(uint)));
-                                RhCreateAndInject(path, args, 0, 0, null, Path.Combine(currDir, "Nucleus.SHook64.dll"), ptr, (uint)size, pid);
-                                pOutPID = Marshal.ReadInt32(pid);
-                                Marshal.FreeHGlobal(pid);
-                            }
-                            catch (Exception ex)
-                            {
-                                Log(string.Format("ERROR - {0}", ex.Message));
-                                //using (StreamWriter writer = new StreamWriter("error-log.txt", true))
-                                //{
-                                //    writer.WriteLine("[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "]" + "ex msg: {0}, ex str: {1}", ex.Message, ex.ToString());
-                                //}
+                                
+                                Log("Process with this path is already running! Skipping creating a new process");
+                                pOutPID = (uint)gameProc.Id;
+                                alreadyExists = true;
                             }
                         }
-                        else //if (Is64Bit(path) == false)
-                        {
-                            try
-                            {
-                                Log("x32 game detected, using Nucleus.Inject32 and injecting Nucleus.SHook32.dll");
-                                //pidTest = gen.Inject(path, args, 0, 0, Path.Combine(currDir, "Nucleus.Hook32.dll"), null, IntPtr.Zero, 0);
-                                string injectorPath = Path.Combine(currDir, "Nucleus.Inject32.exe");
-                                ProcessStartInfo injstartInfo = new ProcessStartInfo();
-                                injstartInfo.FileName = injectorPath;
-                                object[] injargs = new object[]
-                                {
-                                    0, path, args, 0, 0, Path.Combine(currDir, "Nucleus.SHook32.dll"), null, isHook, renameMutex, mutexToRename, setWindow, isDebug, nucleusFolderPath, blockRaw
-                                };
-                                var sbArgs = new StringBuilder();
-                                foreach (object arg in injargs)
-                                {
-                                    sbArgs.Append(" \"");
-                                    sbArgs.Append(arg);
-                                    sbArgs.Append("\"");
-                                }
-
-                                string arguments = sbArgs.ToString();
-                                injstartInfo.Arguments = arguments;
-                                //injstartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                                //injstartInfo.CreateNoWindow = true;
-                                injstartInfo.UseShellExecute = false;
-                                injstartInfo.RedirectStandardOutput = true;
-
-                                //if (runAdmin)
-                                //{
-                                //    //    injstartInfo.FileName = "explorer";
-                                //    //    injstartInfo.Arguments = injectorPath + " " + arguments;
-                                //    injstartInfo.Verb = "runas";
-                                //}
-                                Process injectProc = Process.Start(injstartInfo);
-                                injectProc.OutputDataReceived += proc_OutputDataReceived;
-                                injectProc.BeginOutputReadLine();
-
-                                //using (StreamWriter writer = new StreamWriter("important.txt", true))
-                                //{
-                                //    writer.WriteLine("readtoend: {0}, readline: {1}", injectProc.StandardOutput.ReadToEnd(), injectProc.StandardOutput.ReadLine());
-                                //}
-
-
-                                injectProc.WaitForExit();
-
-                                //GenericGameHandler.RhCreateAndInject(path, args, 0, 0, Path.Combine(currDir, "Nucleus.Hook32.dll"), Path.Combine(currDir, "Nucleus.Hook64.dll"), IntPtr.Zero, 0, pid);
-                                //pidTest = Nucleus.Injector32.Injector32.RhCreateAndInject(path, args, 0, 0, Path.Combine(currDir, "Nucleus.Hook32.dll"), Path.Combine(currDir, "Nucleus.Hook64.dll"), IntPtr.Zero, 0, pid);                        
-                            }
-                            catch (Exception ex)
-                            {
-                                Log(string.Format("ERROR - {0}", ex.Message));
-                                //using (StreamWriter writer = new StreamWriter("error-log.txt", true))
-                                //{
-                                //    writer.WriteLine("[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "]" + "is64: false, ex msg: {0}, ex str: {1}", ex.Message, ex.ToString());
-                                //}
-                            }
-                        }
-                        //else
-                        //{
-                        //    Log(string.Format("ERROR - Machine type {0} not implemented", GetDllMachineType(path)));
-                        //    //using (StreamWriter writer = new StreamWriter("error-log.txt", true))
-                        //    //{
-                        //    //    writer.WriteLine("[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "]" + "Machine type: '{0}' not implemented.", GetDllMachineType(path));
-                        //    //}
-                        //}
                     }
-                    else // delay method
+
+                    if(!alreadyExists)
                     {
-                        Log("Starting game and injecting start up hooks using delay method");
-
-                        string directoryPath = Path.GetDirectoryName(path);
-                        STARTUPINFO si = new STARTUPINFO();
-                        PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
-                        bool success = CreateProcess(path, args, IntPtr.Zero, IntPtr.Zero, false, ProcessCreationFlags.CREATE_SUSPENDED, IntPtr.Zero, directoryPath, ref si, out pi);
-
-                        if (!success)
+                        try
                         {
-                            Log(string.Format("ERROR - CreateProcess failed - startGamePath: {0}, startArgs: {1}, dirpath: {2}", path, args, directoryPath));
-                            //using (StreamWriter writer = new StreamWriter("error-log.txt", true))
+                            //if(useNucleusEnvironment)
                             //{
-                            //    writer.WriteLine("[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "]" + ");
+                            //    bool success = CreateProcess(null, path + " " + args, IntPtr.Zero, IntPtr.Zero, false, (uint)ProcessCreationFlags.CREATE_SUSPENDED | (uint)ProcessCreationFlags.CREATE_UNICODE_ENVIRONMENT, envPtr, Path.GetDirectoryName(path), ref startup, out PROCESS_INFORMATION processInformation);
+                            //    if (!success)
+                            //    {
+                            //        Log(string.Format("ERROR - CreateProcess failed - startGamePath: {0}, startArgs: {1}, dirpath: {2}", path, args, Path.GetDirectoryName(path)));
+                            //        return;
+                            //    }
+
+                            //    procInfo = processInformation;
+                            //    pOutPID = (uint)processInformation.dwProcessId;
                             //}
-                            return;
-                        }
 
-                        ResumeThread(pi.hThread);
+                            //Thread.Sleep(1000);
 
-                        WaitForInputIdle(pi.hProcess, uint.MaxValue);
-
-                        SuspendThread(pi.hThread);
-
-                        if (gameIs64)
-                        {
-                            Log("x64 game detected, injecting Nucleus.SHook64.dll");
-                            NativeAPI.RhInjectLibrary((int)pi.dwProcessId, 0, 0, null, Path.Combine(currDir, "Nucleus.SHook64.dll"), ptr, size);
-                            pOutPID = (int)pi.dwProcessId;
-                        }
-                        else //if (Is64Bit(path) == false)
-                        {
-                            try
+                            string injectorPath = Path.Combine(currDir, $"Nucleus.IJ{(is64 ? "x64" : "x86")}.exe");
+                            ProcessStartInfo injstartInfo = new ProcessStartInfo();
+                            injstartInfo.FileName = injectorPath;
+                            object[] injargs = new object[]
                             {
-                                Log("x32 game detected, using Nucleus.Inject32 and injecting Nucleus.SHook32.dll");
-                                string injectorPath = Path.Combine(currDir, "Nucleus.Inject32.exe");
-                                ProcessStartInfo injstartInfo = new ProcessStartInfo();
-                                injstartInfo.FileName = injectorPath;
-                                object[] injargs = new object[]
-                                {
-                                    1, (int)pi.dwProcessId, 0, 0, Path.Combine(currDir, "Nucleus.SHook32.dll"), null, isHook, renameMutex, mutexToRename, setWindow, isDebug, nucleusFolderPath, blockRaw
-                                };
-                                var sbArgs = new StringBuilder();
-                                foreach (object arg in injargs)
-                                {
-                                    sbArgs.Append(" \"");
-                                    sbArgs.Append(arg);
-                                    sbArgs.Append("\"");
-                                }
+                            0, // Tier 0 : start up hook
+							path, // EXE path
+							args, // Command line arguments. TODO: these args should be converted to base64 to prevent any special characters e.g. " breaking the injargs
+							pCreationFlags, // Process creation flags
+							0, // InInjectionOptions (EasyHook)
+							Path.Combine(currDir, "Nucleus.SHook32.dll"), // lib path 32
+							Path.Combine(currDir, "Nucleus.SHook64.dll"), // lib path 64
+							isHook, // Window hooks
+							renameMutex, // Renames mutexes/semaphores/events hook
+							mutexToRename,
+                            setWindow, // Set window hook
+							isDebug,
+                            nucleusFolderPath,
+                            blockRaw,
+                            useNucleusEnvironment,
+                            playerNick,
+                            createSingle,
+                            rawHid
+                            };
 
-                                string arguments = sbArgs.ToString();
-                                injstartInfo.Arguments = arguments;
-                                //injstartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                                //injstartInfo.CreateNoWindow = true;
-                                injstartInfo.UseShellExecute = false;
-                                injstartInfo.RedirectStandardOutput = true;
-
-                                //if (runAdmin)
-                                //{
-                                //    //injstartInfo.FileName = "explorer";
-                                //    //injstartInfo.Arguments = injectorPath + " " + arguments;
-                                //    injstartInfo.Verb = "runas";
-                                //}
-                                Process injectProc = Process.Start(injstartInfo);
-                                //injectProc.OutputDataReceived += proc_OutputDataReceived;
-                                //injectProc.BeginOutputReadLine();
-
-                                //using (StreamWriter writer = new StreamWriter("important.txt", true))
-                                //{
-                                //    writer.WriteLine("readtoend: {0}, readline: {1}", injectProc.StandardOutput.ReadToEnd(), injectProc.StandardOutput.ReadLine());
-                                //}
-
-
-                                injectProc.WaitForExit();
-                            }
-                            catch (Exception ex)
+                            var sbArgs = new StringBuilder();
+                            foreach (object arg in injargs)
                             {
-                                Log(string.Format("ERROR - {0}", ex.Message));
-                                //using (StreamWriter writer = new StreamWriter("error-log.txt", true))
-                                //{
-                                //    writer.WriteLine("[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "]" + "ex msg: {0}, ex str: {1}", ex.Message, ex.ToString());
-                                //}
+                                //Converting to base64 prevents characters like " or \ breaking the arguments
+                                string arg64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(arg.ToString()));
+
+                                sbArgs.Append(" \"");
+                                sbArgs.Append(arg64);
+                                sbArgs.Append("\"");
                             }
+
+                            string arguments = sbArgs.ToString();
+                            injstartInfo.Arguments = arguments;
+                            //injstartInfo.WindowStyle = ProcessWindowStyle.Hidden;
+                            //injstartInfo.CreateNoWindow = true;
+                            injstartInfo.UseShellExecute = false;
+                            injstartInfo.RedirectStandardOutput = true;
+                            injstartInfo.RedirectStandardInput = true;
+
+                            Process injectProc = Process.Start(injstartInfo);
+                            injectProc.OutputDataReceived += proc_OutputDataReceived;
+                            injectProc.BeginOutputReadLine();
+                            injectProc.WaitForExit();
+
                         }
-                        ResumeThread(pi.hThread);
-                        pOutPID = (int)pi.dwProcessId;
+                        catch (Exception ex)
+                        {
+                            Log(string.Format("ERROR - {0}", ex.Message));
+                        }
+
+                        if (injectFailed)
+                        {
+                            injectFailed = false;
+                            throw new Exception("Failed to create and/or inject start up hook dll. " + tri + " of 2.");
+                        }
+
+                        //if(useNucleusEnvironment)
+                        //{
+                        //    ResumeThread(procInfo.hThread);
+                        //}
+
+                        Thread.Sleep(1000);
                     }
+
                 }
                 else // regular method (no hooks)
                 {
                     Log("Starting game via regular process start method (no start up hooks enabled)");
-                    //if(runAdmin)
-                    //{
-                    //    //startInfo.FileName = "explorer";
-                    //    //startInfo.Arguments = path + " " + args;
-                    //    startInfo.Verb = "runas";
-                    //}
-                    proc = Process.Start(startInfo);
 
 
-                    pOutPID = proc.Id;
+                    bool success = CreateProcess(null, path + " " + args, IntPtr.Zero, IntPtr.Zero, false, (uint)ProcessCreationFlags.CREATE_UNICODE_ENVIRONMENT, envPtr, Path.GetDirectoryName(path), ref startup, out PROCESS_INFORMATION processInformation);
+                    if (!success)
+                    {
+                        Log(string.Format("ERROR - CreateProcess failed - startGamePath: {0}, startArgs: {1}, dirpath: {2}", path, args, Path.GetDirectoryName(path)));
+                        return;
+                    }
+
+                    pOutPID = (uint)processInformation.dwProcessId;
+                    proc = Process.GetProcessById((int)pOutPID);
+                    //pOutPID = proc.Id;
                     regMethod = true;
-                    
                 }
 
+                Thread.Sleep(1000);
 
-                
-                ConsoleU.WriteLine("Game started, process ID:" + pOutPID /*Marshal.ReadInt32(pid)*/ /*proc.Id*/ /*(int)pi.dwProcessId*/, Palette.Success);
-                if(isDebug)
+                while (pOutPID == 0)
                 {
-                    if (regMethod)
+                    Thread.Sleep(50);
+                }
+
+                bool isRunning = Process.GetProcesses().Any(x => x.Id == (int)pOutPID);
+                bool foundProc = false;
+                if (!isRunning || (isRunning && Process.GetProcessById((int)pOutPID).ProcessName.ToLower() != Path.GetFileNameWithoutExtension(path).ToLower()))
+                {
+                    if(isRunning)
                     {
-                        Thread.Sleep(100);
-                        Log(string.Format("Game started, process {0} (pid {1})", proc.ProcessName, pOutPID));
+                        Log("Process ID " + pOutPID + " exists but does not match expected process name. Attempting to resolve.");
                     }
                     else
                     {
-                        Thread.Sleep(100);
-                        Log(string.Format("Game started, process ID: {0}", pOutPID));
+                        Log("Process ID " + pOutPID + " doesn't currently exist. Seeing if there is a process running by its path");
+                    }
+
+                    Process[] gameProcs = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(path));
+
+                    if (gameProcs.Length > 0)
+                    {
+                        foreach (Process gameProc in gameProcs)
+                        {
+                            if (gameProc.GetMainModuleFileName().ToLower() == path.ToLower())
+                            {
+                                Log("Process ID changed to " + pOutPID);
+                                foundProc = true;
+                                isRunning = true;
+                                pOutPID = (uint)gameProc.Id;
+                            }
+                        }
+                        if(!foundProc)
+                        {
+                            Log("Could not find process by its path");
+                        }
+                    }
+                    else
+                    {
+                        Log("Could not find any matching process names");
                     }
                 }
+                else
+                {
+                    Log("Process ID: " + pOutPID);
+                    if(Process.GetProcessById((int)pOutPID).GetMainModuleFileName().ToLower() == path.ToLower())
+                    {
+                        foundProc = true;
+                        isRunning = true;
+                    }
+                }
+
+                //Thread.Sleep(100);
+                
+                //if (proc != null && proc.Threads[0].ThreadState != System.Diagnostics.ThreadState.Running)
+                if (!isRunning && !foundProc)
+                {
+                    Log("Process with ID " + pOutPID + " is still not currently running. Checking every 50 miliseconds for 10 seconds to see if process is running yet.");
+                    for (int times = 0; times < 200; times++)
+                    {
+                        Thread.Sleep(50);
+                        isRunning = Process.GetProcesses().Any(x => x.Id == (int)pOutPID);
+                        if (isRunning)
+                        {
+                            Log("Attempt #" + times + " - Process is now running");
+                            proc = Process.GetProcessById((int)pOutPID);
+                            break;
+                        }
+                        if (times == 199 && !isRunning)
+                        {
+                            Log(string.Format("ERROR - Process with an id of {0} is not running after 10 seconds. Aborting.", pOutPID));
+
+                            throw new Exception(string.Format("ERROR - Process with an id of {0} is not running after 10 seconds. Aborting.", pOutPID));
+                        }
+                    }
+                }
+
+                ConsoleU.WriteLine("Game started, process ID:" + pOutPID /*Marshal.ReadInt32(pid)*/ /*proc.Id*/ /*(int)pi.dwProcessId*/, Palette.Success);
+                if (isDebug)
+                {
+                    //if (regMethod)
+                    //{
+                        //Thread.Sleep(100);
+                        Log(string.Format("Game started, process ID: {0}", pOutPID));
+                    //}
+                    //else
+                    //{
+                    //    Thread.Sleep(100);
+                    //    Log(string.Format("Game started, process ID: {0}", pOutPID));
+                    //}
+                }
+                
             }
 
             catch (Exception ex)
@@ -514,6 +561,10 @@ namespace StartGame
                     }
                     StartGame(path, args);
                 }
+                else
+                {
+                    MessageBox.Show("Nucleus was unable to launch and/or find the proper process for this instance. Please close Nucleus and try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 
@@ -523,10 +574,16 @@ namespace StartGame
             {
                 return;
             }
+            if(e.Data.Equals("injectfailed"))
+            {
+                injectFailed = true;
+                return;
+            }
             //Log($"Redirected output: {e.Data}");
-            Thread.Sleep(100);
+            //Thread.Sleep(100);
+            Log("Received output: " + e.Data);
             Console.WriteLine($"Redirected output: {e.Data}");
-            int.TryParse(e.Data, out pOutPID);
+            uint.TryParse(e.Data, out pOutPID);
         }
 
         static void Main(string[] args)
@@ -569,7 +626,9 @@ namespace StartGame
                              && !skey.Contains("isdebug")
                              && !skey.Contains("nucleusfolderpath")
                              && !skey.Contains("blockraw")
-                             //&& !skey.Contains("runadmin")
+                             && !skey.Contains("nucenv")
+                             && !skey.Contains("playernick")
+                             && !skey.Contains("starthks")
                              && !skey.Contains("root")
                              && !skey.Contains("destination")
                              && !skey.Contains("direxclusions")
@@ -580,6 +639,8 @@ namespace StartGame
                              && !skey.Contains("numplayers")
                              && !skey.Contains("symlink")
                              //&& !skey.Contains("rawhid")
+                             && !skey.Contains("createsingle")
+                             && !skey.Contains("rawhid")
                              && !skey.Contains("output"))
                              
                                                           
@@ -598,8 +659,10 @@ namespace StartGame
                     //Log("Extra arguments:" + argument);
                     ConsoleU.WriteLine("Extra arguments:" + argument, Palette.Feedback);
 
+
                     string[] splited = (arg + argument).Split(new string[] { "|::|" }, StringSplitOptions.None);
                     string key = splited[0].ToLower();
+                    //Log("key " + key);
 
                     if (key.Contains("monitors"))
                     {
@@ -641,10 +704,26 @@ namespace StartGame
                     {
                         blockRaw = Boolean.Parse(splited[1]);
                     }
-                    //else if (key.Contains("runnotadmin"))
-                    //{
-                    //    runAdmin = Boolean.Parse(splited[1]);
-                    //}
+                    else if (key.Contains("createsingle"))
+                    {
+                        createSingle = Boolean.Parse(splited[1]);
+                    }
+                    else if (key.Contains("rawhid"))
+                    {
+                        rawHid = splited[1];
+                    }
+                    else if (key.Contains("nucenv"))
+                    {
+                        useNucleusEnvironment = Boolean.Parse(splited[1]);
+                    }
+                    else if (key.Contains("playernick"))
+                    {
+                        playerNick = splited[1];
+                    }
+                    else if (key.Contains("starthks"))
+                    {
+                        useStartupHooks = Boolean.Parse(splited[1]);
+                    }
                     else if (key.Contains("root"))
                     {
                         root = splited[1];
@@ -712,6 +791,7 @@ namespace StartGame
                             path = div[0];
                             workingDir = div[1];
                         }
+
                         Log($"EXE: {path} ARGS: {argu} WORKDIR: {workingDir}");
                         ConsoleU.WriteLine($"Start game: EXE: {path} ARGS: {argu} WORKDIR: {workingDir}", Palette.Feedback);
                         StartGame(path, argu, workingDir);

@@ -24,7 +24,7 @@ namespace Nucleus.Coop
     /// </summary>
     public partial class MainForm : BaseForm
     {
-        public string version = "v0.9.8.1 ALPHA";
+        public string version = "v0.9.9.9 f1";
 
         private Settings settingsForm = null;
 
@@ -54,11 +54,15 @@ namespace Nucleus.Coop
         private int TopMost_HotkeyID = 2;
         private int StopSession_HotkeyID = 3;
 
+        private List<string> profilePaths = new List<string>();
+
         private readonly IniFile ini = new Gaming.IniFile(Path.Combine(Directory.GetCurrentDirectory(), "Settings.ini"));
 
         private Thread handlerThread;
 
         private bool TopMostToggle = true;
+
+		public Action<IntPtr> RawInputAction { get; set; }
 
         public enum MachineType : ushort
         {
@@ -152,7 +156,7 @@ namespace Nucleus.Coop
                 btn_gameOptions.Font = new Font("Segoe UI", float.Parse((ini.IniReadValue("Advanced", "Font")))-1.75f);
             }
                 
-            sideInfoLbl.Text = "Modded by ZeroFox" + "\n" + version;
+            sideInfoLbl.Text = "Mod version" + "\n" + version;
 
             positionsControl = new PositionsControl();
             Settings settingsForm = new Settings(this, positionsControl);
@@ -162,7 +166,7 @@ namespace Nucleus.Coop
             settingsForm.RegHotkeys(this);
 
             controls = new Dictionary<UserGameInfo, GameControl>();
-            gameManager = new GameManager();
+            gameManager = new GameManager(this);
 
             optionsControl = new PlayerOptionsControl();
             jsControl = new JSUserInputControl();
@@ -175,7 +179,6 @@ namespace Nucleus.Coop
             list_Games.Select();
 
             gameManager.ReorderUserProfile();
-            //MessageBox.Show("list games: " + list_Games.Height + "\nform: " + this.Height + "\nbtnsearhc y coord: " + btnSearch.Location.Y + "\nsteppanel: " + StepPanel.Height);
 
             //list_Games.AutoScroll = false;
             //int vertScrollWidth = SystemInformation.VerticalScrollBarWidth;
@@ -258,9 +261,15 @@ namespace Nucleus.Coop
 
         protected override void WndProc(ref Message m)
         {
+			//TODO: if close message, kill application not just window
+
             //int msg = m.Msg;
             //LogManager.Log(msg.ToString());
-            if (m.Msg == 0x0312 && m.WParam.ToInt32() == KillProcess_HotkeyID)
+			if(m.Msg == 0x00FF)//WM_INPUT
+			{
+				RawInputAction(m.LParam);
+			}
+            else if (m.Msg == 0x0312 && m.WParam.ToInt32() == KillProcess_HotkeyID)
             {
                 //System.Diagnostics.Process.GetCurrentProcess().Kill();
                 User32Util.ShowTaskBar();
@@ -461,6 +470,7 @@ namespace Nucleus.Coop
 
             currentProfile = new GameProfile();
             currentProfile.InitializeDefault(currentGame);
+			gameManager.UpdateCurrentGameProfile(currentProfile);
 
             gameNameControl.GameInfo = currentGameInfo;
 
@@ -543,8 +553,8 @@ namespace Nucleus.Coop
             }
 
 
-            if (currentStepIndex == 0)
-            {
+            //if (currentStepIndex == 0)
+            //{
                 foreach (Control c in StepPanel.Controls)
                 {
                     if (!c.Name.Equals("scriptAuthorLbl") && !c.Name.Equals("scriptAuthorTxt"))
@@ -552,11 +562,11 @@ namespace Nucleus.Coop
                         StepPanel.Controls.Remove(c);
                     }
                 }
-            }
-            else
-            {
-                this.StepPanel.Controls.Clear();
-            }
+            //}
+            //else
+            //{
+                //this.StepPanel.Controls.Clear();
+            //}
 
         }
 
@@ -621,7 +631,7 @@ namespace Nucleus.Coop
             if (handler != null)
             {
                 Log("OnFormClosed method calling Handler End function");
-                handler.End();
+                handler.End(false);
             }
             User32Util.ShowTaskBar();
         }
@@ -630,18 +640,24 @@ namespace Nucleus.Coop
         {
             if (btn_Play.Text == "S T O P")
             {
-                try
+	            try
                 {
-                    if (handler.FakeFocus != null)
-                    {
-                        handler.FakeFocus.Abort();
-                    }
-                    if (handler != null)
+					//Redundant, already in GenericGameHandler.End()
+					//if (handler.FakeFocus != null)
+	                //{
+		            //    handler.FakeFocus.Abort();
+	                //}
+					if (handler != null)
                     {
                         Log("Stop button clicked, calling Handler End function");
-                        handler.End();
+                        handler.End(true);
                     }
 
+                    foreach (System.Windows.Forms.Form openForm in Application.OpenForms)
+                    {
+                        if (openForm.Name == "Hide Desktop")
+                            openForm.Close();
+                    }
                 }
                 catch { }
                 User32Util.ShowTaskBar();
@@ -657,6 +673,11 @@ namespace Nucleus.Coop
 
             btn_Play.Text = "S T O P";
             btnBack.Enabled = false;
+
+            gameManager.AddScript(Path.GetFileNameWithoutExtension(currentGame.JsFileName));
+
+            currentGame = gameManager.GetGame(currentGameInfo.ExePath);
+            currentGameInfo.InitializeDefault(currentGame, currentGameInfo.ExePath);
 
             handler = gameManager.MakeHandler(currentGame);
             handler.Initialize(currentGameInfo, GameProfile.CleanClone(currentProfile));
@@ -760,9 +781,25 @@ namespace Nucleus.Coop
 
         private void btnSearch_Click(object sender, EventArgs e)
         {
+            SearchGame();
+        }
+
+        public void SearchGame(string exeName = null)
+        {
             using (OpenFileDialog open = new OpenFileDialog())
             {
-                open.Filter = "Game Executable Files|*.exe";
+                
+                if(string.IsNullOrEmpty(exeName))
+                {
+                    open.Title = "Select a game executable to add to Nucleus";
+                    open.Filter = "Game Executable Files|*.exe";
+                }
+                else
+                {
+                    open.Title = string.Format("Select {0} to add the game to Nucleus", exeName);
+                    open.Filter = "Game Exe|" + exeName;
+                }
+                
                 if (open.ShowDialog() == DialogResult.OK)
                 {
                     string path = open.FileName;
@@ -776,7 +813,7 @@ namespace Nucleus.Coop
 
                         if (list.ShowDialog() == DialogResult.OK)
                         {
-                            UserGameInfo game = gameManager.TryAddGame(path, list.Selected);
+                            UserGameInfo game = GameManager.Instance.TryAddGame(path, list.Selected);
 
                             //if (game == null)
                             //{
@@ -792,7 +829,7 @@ namespace Nucleus.Coop
                             //    {
                             if (game != null)
                             {
-                                MessageBox.Show("Game accepted as " + game.Game.GameName);
+                                MessageBox.Show(string.Format("The game {0} has been added!", game.Game.GameName), "Nucleus - Game added");
                                 RefreshGames();
                             }
 
@@ -803,8 +840,8 @@ namespace Nucleus.Coop
                     }
                     else if (info.Count == 1)
                     {
-                        UserGameInfo game = gameManager.TryAddGame(path, info[0]);
-                        MessageBox.Show("Game accepted as " + game.Game.GameName);
+                        UserGameInfo game = GameManager.Instance.TryAddGame(path, info[0]);
+                        MessageBox.Show(string.Format("The game {0} has been added!", game.Game.GameName), "Nucleus - Game added");
                         RefreshGames();
                     }
                     else
@@ -866,7 +903,7 @@ namespace Nucleus.Coop
             if (File.Exists(userProfile))
             {
                 string jsonString = File.ReadAllText(userProfile);
-                JObject jObject = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString) as JObject;
+                JObject jObject = JsonConvert.DeserializeObject(jsonString) as JObject;
 
                 JArray games = jObject["Games"] as JArray;
                 for (int i = 0; i < games.Count; i++)
@@ -882,7 +919,7 @@ namespace Nucleus.Coop
                         {
                             arch = "x64";
                         }
-                        else if(Is64Bit(exePath) == true)
+                        else if(Is64Bit(exePath) == false)
                         {
                             arch = "x86";
                         }
@@ -890,7 +927,7 @@ namespace Nucleus.Coop
                         {
                             arch = "Unknown";
                         }
-                        MessageBox.Show(string.Format("Game Name: {0}\nArchitecture: {1}\nSteam ID: {2}\n\nScript Filename: {3}\nNucleus Game Content Path: {4}\nOrig Exe Path: {5}\n\nMax Players: {6}\nSupports XInput: {7}\nSupports DInput: {8}\nSupports Keyboard: {9}", currentGameInfo.Game.GameName, arch, currentGameInfo.Game.SteamID, currentGameInfo.Game.JsFileName, Path.Combine(gameManager.GetAppContentPath(), gameGuid), exePath, currentGameInfo.Game.MaxPlayers, currentGameInfo.Game.Hook.XInputEnabled, currentGameInfo.Game.Hook.DInputEnabled, currentGameInfo.Game.SupportsKeyboard), "Game Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(string.Format("Game Name: {0}\nArchitecture: {1}\nSteam ID: {2}\n\nScript Filename: {3}\nNucleus Game Content Path: {4}\nOrig Exe Path: {5}\n\nMax Players: {6}\nSupports XInput: {7}\nSupports DInput: {8}\nSupports Keyboard: {9}\nSupports multiple keyboards and mice: {10}", currentGameInfo.Game.GameName, arch, currentGameInfo.Game.SteamID, currentGameInfo.Game.JsFileName, Path.Combine(gameManager.GetAppContentPath(), gameGuid), exePath, currentGameInfo.Game.MaxPlayers, currentGameInfo.Game.Hook.XInputEnabled, currentGameInfo.Game.Hook.DInputEnabled, currentGameInfo.Game.SupportsKeyboard, currentGameInfo.Game.SupportsMultipleKeyboardsAndMice), "Game Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
@@ -903,7 +940,7 @@ namespace Nucleus.Coop
             if (File.Exists(userProfile))
             {
                 string jsonString = File.ReadAllText(userProfile);
-                JObject jObject = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString) as JObject;
+                JObject jObject = JsonConvert.DeserializeObject(jsonString) as JObject;
 
                 JArray games = jObject["Games"] as JArray;
                 for (int i = 0; i < games.Count; i++)
@@ -957,6 +994,7 @@ namespace Nucleus.Coop
 
             if (selectedControl.GetType() == typeof(GameControl) || selectedControl.GetType() == typeof(Button))
             {
+
                 bool btnClick = false;
                 if (selectedControl.GetType() == typeof(GameControl))
                 {
@@ -972,6 +1010,11 @@ namespace Nucleus.Coop
                 }
 
                 gameContextMenuStrip.Items[1].Visible = false;
+                gameContextMenuStrip.Items[7].Visible = false;
+                gameContextMenuStrip.Items[8].Visible = false;
+                gameContextMenuStrip.Items[9].Visible = false;
+                gameContextMenuStrip.Items[10].Visible = false;
+                gameContextMenuStrip.Items[11].Visible = false;
 
                 if (string.IsNullOrEmpty(currentGameInfo.GameGuid) || currentGameInfo == null)
                 {
@@ -984,13 +1027,128 @@ namespace Nucleus.Coop
                 else
                 {
                     gameContextMenuStrip.Items[0].Text = currentGameInfo.Game.GameName;
+
+                    bool configPathExists = false;
+                    bool savePathExists = false;
+
                     for (int i = 1; i < gameContextMenuStrip.Items.Count; i++)
                     {
                         //if(i > 1 || (i == 1 && currentGameInfo.Game.Description?.Length > 0))
                         //{
                         //    gameContextMenuStrip.Items[i].Visible = true;
                         //}
+
+                        
                         gameContextMenuStrip.Items[i].Visible = true;
+                        
+
+                        if(string.IsNullOrEmpty(currentGameInfo.Game.UserProfileConfigPath) && string.IsNullOrEmpty(currentGameInfo.Game.UserProfileSavePath))
+                        {
+                            if(i == 7)
+                            {
+                                gameContextMenuStrip.Items[i].Visible = false;
+                            }
+                        }
+                        else if (i == 1)
+                        {
+                            profilePaths.Clear();
+                            profilePaths.Add(Environment.GetEnvironmentVariable("userprofile"));
+                            if (currentGameInfo.Game.UseNucleusEnvironment)
+                            {
+                                string targetDirectory = $@"C:\Users\{Environment.UserName}\NucleusCoop\";
+
+                                if (Directory.Exists(targetDirectory))
+                                {
+                                    string[] subdirectoryEntries = Directory.GetDirectories(targetDirectory, "*", SearchOption.TopDirectoryOnly);
+                                    foreach (string subdirectory in subdirectoryEntries)
+                                    {
+                                        profilePaths.Add(subdirectory);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (i == 9)
+                        {
+                            (gameContextMenuStrip.Items[8] as ToolStripMenuItem).DropDownItems.Clear();
+                            (gameContextMenuStrip.Items[9] as ToolStripMenuItem).DropDownItems.Clear();
+                            if (currentGameInfo.Game.UserProfileConfigPath?.Length > 0)
+                            {
+                                if (profilePaths.Count > 0)
+                                {
+                                    foreach (string profilePath in profilePaths)
+                                    {
+                                        string currPath = Path.Combine(profilePath, currentGameInfo.Game.UserProfileConfigPath);
+                                        if (Directory.Exists(currPath))
+                                        {
+                                            if (!configPathExists)
+                                            {
+                                                configPathExists = true;
+                                            }
+
+                                            string nucPrefix = "";
+                                            if (Directory.GetParent(profilePath).Name == "NucleusCoop")
+                                            {
+                                                nucPrefix = "Nucleus: ";
+                                            }
+
+                                            (gameContextMenuStrip.Items[8] as ToolStripMenuItem).DropDownItems.Add(nucPrefix + Path.GetFileName(profilePath.TrimEnd('\\')), null, new EventHandler(UserProfileOpenSubmenuItem_Click));
+                                            (gameContextMenuStrip.Items[9] as ToolStripMenuItem).DropDownItems.Add(nucPrefix + Path.GetFileName(profilePath.TrimEnd('\\')), null, new EventHandler(UserProfileDeleteSubmenuItem_Click));
+                                        }
+                                    }
+                                }
+                            }
+
+                            if(!configPathExists)
+                            {
+                                gameContextMenuStrip.Items[8].Visible = false;
+                                gameContextMenuStrip.Items[9].Visible = false;
+                            }
+                        }
+
+                        if (i == 11)
+                        {
+                            (gameContextMenuStrip.Items[10] as ToolStripMenuItem).DropDownItems.Clear();
+                            (gameContextMenuStrip.Items[11] as ToolStripMenuItem).DropDownItems.Clear();
+                            if (currentGameInfo.Game.UserProfileSavePath?.Length > 0)
+                            {
+                                if (profilePaths.Count > 0)
+                                {
+                                    foreach (string profilePath in profilePaths)
+                                    {
+                                        string currPath = Path.Combine(profilePath, currentGameInfo.Game.UserProfileSavePath);
+                                        if (Directory.Exists(currPath))
+                                        {
+                                            if (!savePathExists)
+                                            {
+                                                savePathExists = true;
+                                            }
+
+                                            string nucPrefix = "";
+                                            if (Directory.GetParent(profilePath).Name == "NucleusCoop")
+                                            {
+                                                nucPrefix = "Nucleus: ";
+                                            }
+
+                                            (gameContextMenuStrip.Items[10] as ToolStripMenuItem).DropDownItems.Add(nucPrefix + Path.GetFileName(profilePath.TrimEnd('\\')), null, new EventHandler(UserProfileOpenSubmenuItem_Click));
+                                            (gameContextMenuStrip.Items[11] as ToolStripMenuItem).DropDownItems.Add(nucPrefix + Path.GetFileName(profilePath.TrimEnd('\\')), null, new EventHandler(UserProfileDeleteSubmenuItem_Click));
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!savePathExists)
+                            {
+                                gameContextMenuStrip.Items[10].Visible = false;
+                                gameContextMenuStrip.Items[11].Visible = false;
+                            }
+                        }
+
+                        if(i == 12 && !configPathExists && !savePathExists)
+                        {
+                            gameContextMenuStrip.Items[7].Visible = false;
+                        }
+
                         if (i == 1 && currentGameInfo.Game.Description == null)
                         {
                             gameContextMenuStrip.Items[i].Visible = false;
@@ -1009,6 +1167,73 @@ namespace Nucleus.Coop
                 for (int i = 1; i < gameContextMenuStrip.Items.Count; i++)
                 {
                     gameContextMenuStrip.Items[i].Visible = false;
+                }
+            }
+        }
+
+        private void UserProfileOpenSubmenuItem_Click(object sender, EventArgs e)
+        {
+            ToolStripMenuItem item = sender as ToolStripMenuItem;
+            var parent = item.OwnerItem;
+
+            string pathSuffix;
+            if (parent.Text.Contains("Config"))
+            {
+                pathSuffix = currentGameInfo.Game.UserProfileConfigPath;
+            }
+            else
+            {
+                pathSuffix = currentGameInfo.Game.UserProfileSavePath;
+            }
+
+            string path;
+            if (item.Text.StartsWith("Nucleus: "))
+            {
+                path = Path.Combine($@"C:\Users\{Environment.UserName}\NucleusCoop\{item.Text.Substring("Nucleus: ".Length)}\", pathSuffix);
+            }
+            else
+            {
+                path = Path.Combine(Environment.GetEnvironmentVariable("userprofile"), pathSuffix);
+            }
+
+            if (Directory.Exists(path))
+            {
+                Process.Start(path);
+            }
+        }
+
+        private void UserProfileDeleteSubmenuItem_Click(object sender, EventArgs e)
+        {
+            ToolStripMenuItem item = sender as ToolStripMenuItem;
+            var parent = item.OwnerItem;
+
+            string pathSuffix;
+            if (parent.Text.Contains("Config"))
+            {
+                pathSuffix = currentGameInfo.Game.UserProfileConfigPath;
+            }
+            else
+            {
+                pathSuffix = currentGameInfo.Game.UserProfileSavePath;
+            }
+
+            string path;
+            if (item.Text.StartsWith("Nucleus: "))
+            {
+                path = Path.Combine($@"C:\Users\{Environment.UserName}\NucleusCoop\{item.Text.Substring("Nucleus: ".Length)}\", pathSuffix);
+            }
+            else
+            {
+                path = Path.Combine(Environment.GetEnvironmentVariable("userprofile"), pathSuffix);
+            }
+
+            
+            if (Directory.Exists(path))
+            {
+                DialogResult dialogResult = MessageBox.Show("Are you sure you want to delete '" + path + "' and all its contents?", "Confirm deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (dialogResult == DialogResult.Yes)
+                {
+                    Directory.Delete(path, true);
                 }
             }
         }
@@ -1131,7 +1356,7 @@ namespace Nucleus.Coop
             MessageBox.Show(currentGameInfo.Game.Description, "Script Author Notes", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private void Button1_Click(object sender, EventArgs e)
+        private void GameOptions_Click(object sender, EventArgs e)
         {
             Button btnSender = (Button)sender;
             Point ptLowerLeft = new Point(0, btnSender.Height);
@@ -1150,6 +1375,29 @@ namespace Nucleus.Coop
             {
                 MessageBox.Show("Unable to open original executable path for this game.", "Not found", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void deleteContentFolderToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string path = Path.Combine(gameManager.GetAppContentPath(), currentGameInfo.Game.GUID);
+            if (Directory.Exists(path))
+            {
+                DialogResult dialogResult = MessageBox.Show("Are you sure you want to delete '" + path + "' and all its contents?", "Confirm deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (dialogResult == DialogResult.Yes)
+                {
+                    Directory.Delete(path, true);
+                }
+            }
+            else
+            {
+                MessageBox.Show("No data in content folder to delete.");
+            }
+        }
+
+        private void btn_Download_Click(object sender, EventArgs e)
+        {
+            Forms.ScriptDownloader scriptDownloader = new Forms.ScriptDownloader(this);
+            scriptDownloader.ShowDialog();
         }
     }
 }

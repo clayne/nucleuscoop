@@ -4,7 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
@@ -84,7 +88,9 @@ namespace Nucleus.Gaming
         public string[] CopyCustomUtils;
         public int PlayersPerInstance;
         public bool UseDevReorder;
-        //public string[] HexEditExe;
+
+        [DllImport("iphlpapi.dll", CharSet = CharSet.Auto)]
+        private static extern int GetBestInterface(UInt32 destAddr, out UInt32 bestIfIndex);
 
         public Type HandlerType
         {
@@ -148,31 +154,6 @@ namespace Nucleus.Gaming
             bHasKeyboardPlayer = hasKeyboard;
         }
 
-        //public void HexEditExe(string[] values)
-        //{
-        //    //if (gen.HexEditExe?.Length > 0)
-        //    //{
-        //    using (StreamWriter writer = new StreamWriter("important.txt", true))
-        //    {
-        //        writer.WriteLine("ExePath: " + ExePath + " Folder.InstancedGameFolder: " + parent.GetFolder(Folder.InstancedGameFolder) + " parent.exePath: " + parent.exePath + " getdirname: " + Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
-        //    }
-        //    foreach (string asciiValues in values)
-        //    {
-        //        if (File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\Data\\45770\\Instance0", "deadrising2otr-ORIG.exe")))
-        //        {
-        //            File.Delete(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\Data\\45770\\Instance0", "deadrising2otr-ORIG.exe"));
-        //        }
-
-        //        File.Move(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\Data\\45770\\Instance0", "deadrising2otr.exe"), Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\Data\\45770\\Instance0", "deadrising2otr-ORIG.exe"));
-        //        string[] splitValues = asciiValues.Split('|');
-        //        if (splitValues.Length > 1)
-        //        {
-        //            PatchFile(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\Data\\45770\\Instance0", "deadrising2otr-ORIG.exe"), Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\Data\\45770\\Instance0", "deadrising2otr.exe"), splitValues[0], splitValues[1]);
-        //        }
-        //    }
-        //    //}
-        //}
-
         public bool HasKeyboardPlayer()
         {
             return bHasKeyboardPlayer;
@@ -196,6 +177,14 @@ namespace Nucleus.Gaming
             get
             {
                 return pInfo.GamepadGuid.ToString();
+            }
+        }
+
+        public bool IsKeyboardPlayer
+        {
+            get
+            {
+                return pInfo.IsKeyboardPlayer;
             }
         }
 
@@ -229,6 +218,64 @@ namespace Nucleus.Gaming
             {
                 return pInfo.Nickname;
             }
+        }
+
+        public string LocalIP
+        {
+            get
+            {
+                //string localIP;
+                //using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0))
+                //{
+                //    socket.Connect("8.8.8.8", 65530);
+                //    IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
+                //    localIP = endPoint.Address.ToString();
+                //}
+                
+                var dadada = GetBestInterface(BitConverter.ToUInt32(IPAddress.Parse("8.8.8.8").GetAddressBytes(), 0), out uint interfaceIndex);
+                IPAddress xxxd = NetworkInterface.GetAllNetworkInterfaces()
+                                .Where(netInterface => netInterface.GetIPProperties().GetIPv4Properties().Index == BitConverter.ToInt32(BitConverter.GetBytes(interfaceIndex), 0)).First().GetIPProperties().UnicastAddresses.Where(ipAdd => ipAdd.Address.AddressFamily == AddressFamily.InterNetwork).First().Address;
+
+                return xxxd.ToString();
+            }
+        }
+
+        public string EnvironmentPlayer
+        {
+            get
+            {
+                return $@"C:\Users\{Environment.UserName}\NucleusCoop\{Nickname}\";
+            }
+        }
+
+        public string EnvironmentRoot
+        {
+            get
+            {
+                return $@"C:\Users\{Environment.UserName}\NucleusCoop\";
+            }
+        }
+
+        public string UserProfileConfigPath
+        {
+            //get
+            //{
+            //    //return parent.UserProfileConfigPath;
+            //}
+            //set { }
+
+            get; set;
+        }
+
+        public string UserProfileSavePath
+        {
+            //get
+            //{
+            //    //return parent.UserProfileSavePath;
+            //}
+            //set { }
+
+            get; set;
         }
 
         public void WriteTextFile(string path, string[] lines)
@@ -807,5 +854,17 @@ namespace Nucleus.Gaming
                 }
             }
         }
-    }
+
+        public void KillProcessesMatchingWindowName(string name)
+        {
+			foreach (var p in System.Diagnostics.Process.GetProcesses().Where(x => x.MainWindowTitle.ToLower().Contains(name.ToLower())).ToArray())
+				p.Kill();
+        }
+
+        public void KillProcessesMatchingProcessName(string name)
+        {
+	        foreach (var p in System.Diagnostics.Process.GetProcesses().Where(x => x.ProcessName.ToLower().Contains(name.ToLower())).ToArray())
+		        p.Kill();
+        }
+	}
 }

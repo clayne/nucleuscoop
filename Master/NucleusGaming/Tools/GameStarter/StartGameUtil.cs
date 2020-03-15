@@ -1,13 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Text;
-using EasyHook;
-using IWshRuntimeLibrary;
+using System.Windows.Forms;
 
 namespace Nucleus.Gaming.Tools.GameStarter
 {
@@ -18,6 +13,7 @@ namespace Nucleus.Gaming.Tools.GameStarter
     {
         private static string lastLine;
         private static object locker = new object();
+        private static readonly IniFile ini = new Gaming.IniFile(Path.Combine(Directory.GetCurrentDirectory(), "Settings.ini"));
 
         public static string GetStartGamePath()
         {
@@ -115,7 +111,7 @@ namespace Nucleus.Gaming.Tools.GameStarter
         /// <param name="waitTime"></param>
         /// <param name="mutex"></param>
         /// <returns></returns>
-        public static int StartGame(string pathToGame, string args, bool hook, bool delay, bool renameMutex, string mutexNames, bool setWindow, bool isDebug, string nucleusFolder, bool blockRaw, /*bool runAdmin, string rawHid,*/ string workingDir = null)
+        public static uint StartGame(string pathToGame, string args, bool hook, bool delay, bool renameMutex, string mutexNames, bool setWindow, bool isDebug, string nucleusFolder, bool blockRaw, bool UseNucleusEnvironment, string playerNick, bool startupHooksEnabled, bool createSingle, string rawHid, /*bool runAdmin, string rawHid,*/ string workingDir = null)
         {
             lock (locker)
             {
@@ -129,39 +125,19 @@ namespace Nucleus.Gaming.Tools.GameStarter
                 }
 
                 //string arguments = 
-                startInfo.Arguments = "\"" + "hook|::|" + hook + "\" \"delay|::|" + delay + "\" \"renamemutex|::|" + renameMutex + "\" \"mutextorename|::|" + mutexNames + "\" \"setwindow|::|" + setWindow + "\" \"isdebug|::|" + isDebug + "\" \"nucleusfolderpath|::|" + nucleusFolder + "\" \"blockraw|::|" + blockRaw /*+ "\" \"runadmin|::|" + runAdmin + "\" \"rawhid|::|" + rawHid*/ + "\" \"game|::|" + pathToGame + workingDir + ";" + args + "\"";
-
+                startInfo.Arguments = "\"" + "hook|::|" + hook + "\" \"delay|::|" + delay + "\" \"renamemutex|::|" + renameMutex + "\" \"mutextorename|::|" + mutexNames + "\" \"setwindow|::|" + setWindow + "\" \"isdebug|::|" + isDebug + "\" \"nucleusfolderpath|::|" + nucleusFolder + "\" \"blockraw|::|" + blockRaw + "\" \"nucenv|::|" + UseNucleusEnvironment + "\" \"playernick|::|" + playerNick + "\" \"starthks|::|" + startupHooksEnabled  + "\" \"createsingle|::|" + createSingle + "\" \"rawhid|::|" + rawHid /*+ "\" \"rawhid|::|" + rawHid*/ + "\" \"game|::|" + pathToGame + workingDir + ";" + args + "\"";
                 startInfo.RedirectStandardOutput = true;
                 startInfo.UseShellExecute = false;
 
-                //if(runNotAdmin)
-                //{
-                //    WshShell shell = new WshShell();
-                //    //string shortcutAddress = (string)shell.SpecialFolders.Item(ref shDesktop) + @"\Notepad.lnk";
-                //    string shortcutAddress = Path.GetDirectoryName(startGamePath) + @"\StartGame.lnk";
-                //    IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutAddress);
-                //    shortcut.Description = "Shortcut for Startgame";
-                //    //shortcut.Hotkey = "Ctrl+Shift+N";
-                //    shortcut.TargetPath = startGamePath;
-                //    shortcut.Arguments = arguments;
-                //    shortcut.Save();
-
-                //    startInfo.FileName = "explorer";
-                //    startInfo.Arguments = shortcutAddress;
-
-                //}
-                //if(runAdmin)
-                //{
-                //    startInfo.Verb = "runas";
-                //}
                 Process proc = Process.Start(startInfo);
+
                 proc.OutputDataReceived += proc_OutputDataReceived;
                 proc.BeginOutputReadLine();
 
                 proc.WaitForExit();
 
                 //parse the last line for the process ID
-                return int.Parse(lastLine.Split(':')[1]);
+                return uint.Parse(lastLine.Split(':')[1]);
             }
         }
         public static void proc_OutputDataReceived(object sender, DataReceivedEventArgs e)
@@ -177,6 +153,7 @@ namespace Nucleus.Gaming.Tools.GameStarter
         public static bool SymlinkGame(string root, string destination, out int exitCode,
             string[] dirExclusions, string[] fileExclusions, string[] fileCopyInstead, bool hardLink, bool symFolders, int numPlayers)
         {
+            
             exitCode = 1;
 
             lock (locker)
@@ -184,6 +161,7 @@ namespace Nucleus.Gaming.Tools.GameStarter
                 string startGamePath = GetStartGamePath();
                 ProcessStartInfo startInfo = new ProcessStartInfo();
                 startInfo.FileName = startGamePath;
+
 
                 string de = "";
                 for (int i = 0; i < dirExclusions.Length; i++)
@@ -220,12 +198,12 @@ namespace Nucleus.Gaming.Tools.GameStarter
                 startInfo.UseShellExecute = true;
                 startInfo.Verb = "runas";
                 startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                Process proc = Process.Start(startInfo);
+                Process proc = Process.Start(startInfo);//TODO: can throw error
 
                 proc.WaitForExit();
-
-                return true;
             }
+
+            return true;
         }
     }
 }

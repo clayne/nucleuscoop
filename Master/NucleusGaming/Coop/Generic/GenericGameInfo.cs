@@ -7,6 +7,7 @@ using System.Reflection;
 using Microsoft.Win32;
 using Nucleus.Gaming.Generic.Step;
 using Nucleus.Gaming.Coop;
+using System.Windows.Forms;
 
 namespace Nucleus.Gaming
 {
@@ -24,6 +25,8 @@ namespace Nucleus.Gaming
         public string[] DirSymlinkExclusions;
         public string[] FileSymlinkExclusions;
         public string[] FileSymlinkCopyInstead;
+        public string[] DirSymlinkCopyInstead;
+        public string[] DirExclusions;
         public bool KeepSymLinkOnExit;
 
         public double HandlerInterval;
@@ -50,9 +53,11 @@ namespace Nucleus.Gaming
         public string BinariesFolder;
 
         public bool FakeFocus;
+        public int FakeFocusInterval = 1000;//TODO: high CPU usage with low value?
+        public bool FakeFocusSendActivate = true;
 
 
-        public void AddOption(string name, string desc, string key, object value, object defaultValue)
+		public void AddOption(string name, string desc, string key, object value, object defaultValue)
         {
             Options.Add(new GameOption(name, desc, key, value, defaultValue));
         }
@@ -102,7 +107,6 @@ namespace Nucleus.Gaming
         public string HookFocusInstances;
         public bool KeepAspectRatio;
         public bool HideDesktop;
-        //public int FakeFocusInterval;
         public bool ResetWindows;
         public bool PartialMutexSearch;
         public bool UseGoldberg;
@@ -132,8 +136,90 @@ namespace Nucleus.Gaming
         public bool PreventWindowDeactivation;
         public bool SymlinkFolders;
         public bool CreateSteamAppIdByExe;
+        public bool ForceSymlink;
+        public string[] UseProcessorsPerInstance;
+        public bool UseDirectX9Wrapper;
+        public string SteamStubDRMPatcherArch;
+        public bool GoldbergLobbyConnect;
+        public string[] X360ceDll;
+        public string[] CMDBatchBefore;
+        public string[] CMDBatchAfter;
+        public bool GoldbergNoLocalSave;
+        public bool UseNucleusEnvironment;
+        public bool ThirdPartyLaunch;
+        public bool ForceProcessPick;
+        public bool KeepMonitorAspectRatio;
+        public string PostHookInstances;
+        public string StartHookInstances;
+        public string[] KillMutexLauncher;
+        public string KillMutexTypeLauncher = "Mutant";
+        public int KillMutexDelayLauncher;
+        public bool PartialMutexSearchLauncher;
+        public string FakeFocusInstances;
+        public bool KeyboardPlayerSkipFakeFocus;
+        public string UserProfileConfigPath;
+        public string UserProfileSavePath;
+        public string[] PlayerSteamIDs;
+        public string[] HexEditExeAddress;
+        public string[] HexEditFileAddress;
+        public bool ForceUserProfileConfigCopy;
+        public bool ForceUserProfileSaveCopy;
+        public bool PromptBeforeProcessGrab;
+        public bool ProcessChangesAtEnd;
+        public bool PromptProcessChangesAtEnd;
+        public string[] DeleteFilesInConfigPath;
+        public string[] DeleteFilesInSavePath;
+        public bool PromptBetweenInstancesEnd;
+        public bool IgnoreDeleteFilesPrompt;
+        public bool ChangeIPPerInstance;
+        //public string NetworkInterface = null;
+        public string FlawlessWidescreen;
+        public string[] RenameAndOrMoveFiles;
+        public string[] DeleteFiles;
+        public bool GoldbergExperimentalRename;
+        public string[] KillProcessesOnClose;
+        public bool KeyboardPlayerSkipPreventWindowDeactivate;
+        public bool DontResize;
+        public bool DontReposition;
+        public bool NotTopMost;
+        public string[] WindowStyleValues;
+        public string[] ExtWindowStyleValues;
+        public bool KillLastInstanceMutex;
+        public bool RefreshWindowAfterStart = false;
+        public bool CreateSingleDeviceFile;
 
-        public Type HandlerType
+        // -- From USS
+        //Effectively a switch for all of USS features
+        public bool SupportsMultipleKeyboardsAndMice;
+		
+		//Hooks
+		public bool HookSetCursorPos = true;
+		public bool HookGetCursorPos = true;
+		public bool HookGetKeyState = true;
+		public bool HookGetAsyncKeyState = true;
+		public bool HookGetKeyboardState = true;
+		public bool HookFilterRawInput;
+		public bool HookFilterMouseMessages;
+		public bool HookUseLegacyInput;
+		public bool HookDontUpdateLegacyInMouseMsg;
+		public bool HookMouseVisibility = true;
+		public bool HookReRegisterRawInput = false;
+		public bool HookReRegisterRawInputMouse = true;
+		public bool HookReRegisterRawInputKeyboard = true;
+
+		//Not hooks
+		public bool SendNormalMouseInput = true;
+		public bool SendNormalKeyboardInput = true;
+		public bool SendScrollWheel = false;
+		public bool ForwardRawKeyboardInput = false;
+		public bool ForwardRawMouseInput = false;
+		public bool DrawFakeMouseCursor = true;
+		public bool LockInputAtStart = false;
+		public bool PreventGameFocus = false;
+		public int LockInputToggleKey = 0x23;//End by default. Keys: https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+		// --
+
+		public Type HandlerType
         {
             get { return typeof(GenericGameHandler); }
         }
@@ -143,16 +229,39 @@ namespace Nucleus.Gaming
             JsFileName = fileName;
             Folder = folderPath;
 
-            StreamReader reader = new StreamReader(str);
-            js = reader.ReadToEnd();
+            //StreamReader reader = new StreamReader(str);
+            //js = reader.ReadToEnd();
+            js = "";
+            using (StreamReader sr = new StreamReader(str))
+            {
+                while (!sr.EndOfStream)
+                {
+                    string line = sr.ReadLine();
+                    if (line.StartsWith("Hub."))
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        js += "\r\n" + line + "\r\n";
+                    }
+                }
+            }
 
             Assembly assembly = typeof(GameOption).Assembly;
 
             engine = new Engine(cfg => cfg.AllowClr(assembly));
-            
+
             engine.SetValue("Game", this);
             engine.Execute("var Nucleus = importNamespace('Nucleus.Gaming');");
-            engine.Execute(js);
+            try
+            {
+                engine.Execute(js);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format("There is an error in the game script {0}. The game this script is for will not appear in the list. If the issue has been fixed, please try re-adding the game.\n\nCommon errors include:\n- A syntax error (such as a \',\' \';\' or \']\' missing)\n- Another script has this GUID (must be unique!)\n- Code is not in the right place or format (for example: methods using Context must be within the Game.Play function)\n\n{1}: {2}", fileName, ex.InnerException, ex.Message), "Error in script", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
             engine.SetValue("Game", (object)null);
         }
 

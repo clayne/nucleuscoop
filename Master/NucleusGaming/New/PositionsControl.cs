@@ -9,11 +9,16 @@ using SlimDX.DirectInput;
 using SlimDX.XInput;
 using Nucleus.Gaming.Coop;
 using System.IO;
+using Nucleus.Gaming.Coop.InputManagement;
+using System.Drawing.Imaging;
+using System.Diagnostics;
 
 namespace Nucleus.Coop
 {
     public class PositionsControl : UserInputControl
     {
+	    private static PositionsControl _positionsControl;
+
         private bool canProceed;
 
         //private bool keyboardPlayer = false;
@@ -48,12 +53,15 @@ namespace Nucleus.Coop
         private Image gamepadImg;
         private Image genericImg;
         private Image keyboardImg;
+		private Image rawKeyboardImg;
+		private Image rawMouseImg;
 
         public bool isDisconnected;
         private int dinputPressed = -1;
+		
+		private readonly IniFile ini = new Gaming.IniFile(Path.Combine(Directory.GetCurrentDirectory(), "Settings.ini"));
 
-
-        private readonly IniFile ini = new Gaming.IniFile(Path.Combine(Directory.GetCurrentDirectory(), "Settings.ini"));
+		private ImageAttributes flashImageAttributes;
 
         public override bool CanProceed
         {
@@ -85,12 +93,14 @@ namespace Nucleus.Coop
 
         public PositionsControl()
         {
-            Initialize();
+	        PositionsControl._positionsControl = this;
+
+	        Initialize();
         }
 
         private void Initialize()
         {
-            this.BackColor = Color.FromArgb(40, 40, 40);
+	        this.BackColor = Color.FromArgb(40, 40, 40);
 
             dinput = new DirectInput();
             //dinputJoysticks = new List<Joystick>();
@@ -128,9 +138,31 @@ namespace Nucleus.Coop
             gamepadImg = Resources.gamepad;
             genericImg = Resources.generic;
             keyboardImg = Resources.keyboard;
+			rawMouseImg = Resources.mouse;
+			rawKeyboardImg = Resources.rawkeyboard;
 
-            RemoveFlicker();
-        }
+			//Flash image attributes
+			{
+				var colorMatrix = new ColorMatrix(new[]
+				{
+					new float[] {1, 0, 0, 0, 0},
+					new float[] {0, 0, 0, 0, 0},
+					new float[] {0, 0, 0, 0, 0},
+					new float[] {0, 1, 0, 1, 0},
+					new float[] {0.4f, 0, 0, 0, 1}
+				});
+
+				flashImageAttributes = new ImageAttributes();
+				flashImageAttributes.SetColorMatrix(colorMatrix);
+			}
+
+			RemoveFlicker();
+		}
+
+		public static void InvalidateFlash()
+		{
+			_positionsControl?.Invalidate();
+		}
 
         protected override void Dispose(bool disposing)
         {
@@ -160,7 +192,7 @@ namespace Nucleus.Coop
                 List<PlayerInfo> data = profile.PlayerData;
                 foreach (PlayerInfo player in data)
                 {
-                    if(!player.IsKeyboardPlayer)
+                    if(!player.IsKeyboardPlayer && !player.IsRawKeyboard && !player.IsRawMouse)
                     {
                         PollGamepad(player);
                     }
@@ -316,6 +348,7 @@ namespace Nucleus.Coop
                     player.IsDInput = true;
                     player.GamepadId = i;
                     string hid = player.DInputJoystick.Properties.InterfacePath;
+                    player.RawHID = hid;
                     int start = hid.IndexOf("hid#");
                     int end = hid.LastIndexOf("#{");
                     string fhid = hid.Substring(start, end - start).Replace('#', '\\').ToUpper();
@@ -355,10 +388,12 @@ namespace Nucleus.Coop
                     }
                 }
 
+                int cOffset = 0;
                 for (int i = 0; i < 4; i++)
                 {
                     Controller c = xinputControllers[i];
                     bool already = false;
+                    
 
                     if (c.IsConnected)
                     {
@@ -389,12 +424,12 @@ namespace Nucleus.Coop
                         changed = true;
 
                         PlayerInfo player = new PlayerInfo();
-                        IList<DeviceInstance> devices = dinput.GetDevices(SlimDX.DirectInput.DeviceType.Gamepad, DeviceEnumerationFlags.AttachedOnly);
+                        IList<DeviceInstance> devices = dinput.GetDevices(SlimDX.DirectInput.DeviceType.Gamepad /*DeviceClass.GameController*/, DeviceEnumerationFlags.AttachedOnly);
                         for (int x = 0; x < devices.Count; x++)
                         {
                             DeviceInstance device = devices[x];
                             //if(!instanceIds.Contains(device.InstanceGuid.ToString()))
-                            if(x == i)
+                            if((x+cOffset) == i)
                             {
                                 //instanceIds.Add(device.InstanceGuid.ToString());
                                 player.GamepadGuid = device.InstanceGuid;
@@ -402,6 +437,7 @@ namespace Nucleus.Coop
                                 player.GamepadName = device.InstanceName;
                                 player.DInputJoystick = new Joystick(dinput, device.InstanceGuid);
                                 string hid = player.DInputJoystick.Properties.InterfacePath;
+                                player.RawHID = hid;
                                 int start = hid.IndexOf("hid#");
                                 int end = hid.LastIndexOf("#{");
                                 string fhid = hid.Substring(start, end - start).Replace('#', '\\').ToUpper();
@@ -414,13 +450,21 @@ namespace Nucleus.Coop
 
                                 break;
                             }
-                            
+                            else
+                            {
+                                
+                            }
                         }
 
                         // new gamepad
                         player.IsXInput = true;
                         player.GamepadId = i;
                         data.Add(player);
+                        
+                    }
+                    else
+                    {
+                        cOffset++;
                     }
                 }
             }
@@ -562,6 +606,10 @@ namespace Nucleus.Coop
                     //keyboardPlayer = true;
                 }
 
+				//Raw mice/keyboards
+				if(game.Game.SupportsMultipleKeyboardsAndMice)
+					playerData.AddRange(RawInputManager.GetDeviceInputInfos());
+
                 // make fake data if needed
                 if (testDinputPlayers != -1)
                 {
@@ -628,392 +676,119 @@ namespace Nucleus.Coop
             Invalidate();
         }
 
-        private bool GetFreeSpace(int screenIndex, out Rectangle? editorBounds, out Rectangle? monitorBounds)
+        bool GetScreenDivisionBounds(UserScreenType screenType, int index, out Rectangle? monitorBounds, out Rectangle? editorBounds, Rectangle bounds, Rectangle ebounds)
+        {
+	        monitorBounds = null;
+	        editorBounds = null;
+			
+			bool Regular(int width, int height, out Rectangle? _monitorBounds, out Rectangle? _editorBounds)
+			{
+				int y = index % height;
+				int x = (index - y) / height;
+
+				int halfw = (int)(bounds.Width / (float)width);
+				int halfh = (int)(bounds.Height / (float)height);
+
+				_monitorBounds = new Rectangle(bounds.X + (halfw * x), bounds.Y + (halfh * y), halfw, halfh);
+				int halfwe = (int)(ebounds.Width / (float)width);
+				int halfhe = (int)(ebounds.Height / (float)height);
+				_editorBounds = new Rectangle(ebounds.X + (halfwe * x), ebounds.Y + (halfhe * y), halfwe, halfhe);
+
+				return true;
+			}
+
+	        switch (screenType)
+	        {
+				case UserScreenType.FullScreen:
+				{
+					if (index >= 1) return false;
+
+					monitorBounds = bounds;
+					editorBounds = ebounds;
+					return true;
+				}
+		        case UserScreenType.DualHorizontal:
+		        {
+			        if (index >= 2) return false;
+
+					return Regular(1, 2, out monitorBounds, out editorBounds);
+					}
+		        case UserScreenType.DualVertical:
+		        {
+			        if (index >= 2) return false;
+
+					return Regular(2, 1, out monitorBounds, out editorBounds);
+				}
+		        case UserScreenType.FourPlayers:
+		        {
+			        if (index >= 4) return false;
+
+			        return Regular(2, 2, out monitorBounds, out editorBounds);
+		        }
+		        case UserScreenType.SixPlayers:
+		        {
+			        if (index >= 6) return false;
+
+					return Regular(3, 2, out monitorBounds, out editorBounds);
+				}
+		        case UserScreenType.EightPlayers:
+		        {
+			        if (index >= 8) return false;
+
+					return Regular(4, 2, out monitorBounds, out editorBounds);
+		        }
+		        case UserScreenType.SixteenPlayers:
+		        {
+			        if (index >= 16) return false;
+
+			        return Regular(4, 4, out monitorBounds, out editorBounds);
+		        }
+		        case UserScreenType.Custom:
+		        {
+					//TODO: needs to be cached
+			        int horLines = int.Parse(ini.IniReadValue("CustomLayout", "HorizontalLines"));
+			        int verLines = int.Parse(ini.IniReadValue("CustomLayout", "VerticalLines"));
+			        int maxPlayers = int.Parse(ini.IniReadValue("CustomLayout", "MaxPlayers"));
+
+			        if (index >= maxPlayers) return false;
+
+			        return Regular(verLines, horLines, out monitorBounds, out editorBounds);
+				}
+			}
+
+	        return false;
+        }
+
+		private bool GetFreeSpace(int screenIndex, out Rectangle? editorBounds, out Rectangle? monitorBounds, PlayerInfo playerToInsert)
         {
             editorBounds = null;
             monitorBounds = null;
-
+			
             var players = profile.PlayerData;
             UserScreen screen = screens[screenIndex];
             Rectangle bounds = screen.MonitorBounds;
             Rectangle ebounds = screen.UIBounds;
+			
+			int index = -1;
+			while (GetScreenDivisionBounds(screen.Type, ++index, out var divMonitorBounds, out var divEditorBounds, bounds, ebounds))
+			{
+				var playersInDiv = players.Where(
+					x => x.ScreenIndex == screenIndex && x.MonitorBounds == divMonitorBounds.Value);
 
-            switch (screen.Type)
-            {
-                case UserScreenType.FullScreen:
-                    for (int i = 0; i < players.Count; i++)
-                    {
-                        PlayerInfo p = players[i];
-                        if (p.ScreenIndex == screenIndex)
-                        {
-                            return false;
-                        }
-                    }
+				//Raw mice/keyboards can go as pairs, nothing else can.
+				if (
+					playerToInsert.IsRawMouse ? playersInDiv.All(x => x.IsRawKeyboard) :
+					playerToInsert.IsRawKeyboard ? playersInDiv.All(x => x.IsRawMouse) :
 
-                    monitorBounds = screen.MonitorBounds;
-                    editorBounds = screen.UIBounds;
-                    return true;
-                case UserScreenType.DualHorizontal:
-                    {
-                        int playersUsing = 0;
-                        Rectangle areaUsed = new Rectangle();
+					!playersInDiv.Any())
+				{
+					monitorBounds = divMonitorBounds;
+					editorBounds = divEditorBounds;
+					return true;
+				}
+			}
 
-                        for (int i = 0; i < players.Count; i++)
-                        {
-                            PlayerInfo p = players[i];
-                            if (p.ScreenIndex == screenIndex)
-                            {
-                                playersUsing++;
-                                areaUsed = p.MonitorBounds;
-                            }
-                        }
-
-                        if (playersUsing == 2)
-                        {
-                            return false;
-                        }
-
-                        int half = (int)(bounds.Height / 2.0f);
-                        for (int i = 0; i < 2; i++)
-                        {
-                            Rectangle area = new Rectangle(bounds.X, bounds.Y + (half * i), bounds.Width, half);
-                            if (!areaUsed.Contains(area))
-                            {
-                                monitorBounds = area;
-
-                                int halfe = (int)(ebounds.Height / 2.0f);
-                                editorBounds = new Rectangle(ebounds.X, ebounds.Y + (halfe * i), ebounds.Width, halfe);
-                                return true;
-                            }
-                        }
-                    }
-                    break;
-                case UserScreenType.DualVertical:
-                    {
-                        int playersUsing = 0;
-                        Rectangle areaUsed = new Rectangle();
-
-                        for (int i = 0; i < players.Count; i++)
-                        {
-                            PlayerInfo p = players[i];
-                            if (p.ScreenIndex == screenIndex)
-                            {
-                                playersUsing++;
-                                areaUsed = p.MonitorBounds;
-                            }
-                        }
-
-                        if (playersUsing == 2)
-                        {
-                            return false;
-                        }
-
-                        int half = (int)(bounds.Width / 2.0f);
-                        for (int i = 0; i < 2; i++)
-                        {
-                            Rectangle area = new Rectangle(bounds.X + (half * i), bounds.Y, half, bounds.Height);
-                            if (!areaUsed.Contains(area))
-                            {
-                                monitorBounds = area;
-                                int halfe = (int)(ebounds.Width / 2.0f);
-                                editorBounds = new Rectangle(ebounds.X + (halfe * i), ebounds.Y, halfe, ebounds.Height);
-                                return true;
-                            }
-                        }
-                    }
-                    break;
-                case UserScreenType.FourPlayers:
-                    {
-                        int playersUsing = 0;
-                        for (int i = 0; i < players.Count; i++)
-                        {
-                            PlayerInfo p = players[i];
-                            if (p.ScreenIndex == screenIndex)
-                            {
-                                playersUsing++;
-                            }
-                        }
-
-                        if (playersUsing == 4)
-                        {
-                            return false;
-                        }
-
-                        int halfw = (int)(bounds.Width / 2.0f);
-                        int halfh = (int)(bounds.Height / 2.0f);
-
-                        for (int x = 0; x < 2; x++)
-                        {
-                            for (int y = 0; y < 2; y++)
-                            {
-                                Rectangle area = new Rectangle(bounds.X + (halfw * x), bounds.Y + (halfh * y), halfw, halfh);
-
-                                bool goNext = false;
-                                // check if there's any player with the area's x,y coord
-                                for (int i = 0; i < players.Count; i++)
-                                {
-                                    PlayerInfo p = players[i];
-                                    if (p.ScreenIndex == screenIndex)
-                                    {
-                                        //if (p.MonitorBounds.X == area.X &&
-                                        //    p.MonitorBounds.Y == area.Y)
-                                        if (p.MonitorBounds.IntersectsWith(area))
-                                        {
-                                            goNext = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if (goNext)
-                                {
-                                    continue;
-                                }
-                                monitorBounds = area;
-                                int halfwe = (int)(ebounds.Width / 2.0f);
-                                int halfhe = (int)(ebounds.Height / 2.0f);
-                                editorBounds = new Rectangle(ebounds.X + (halfwe * x), ebounds.Y + (halfhe * y), halfwe, halfhe);
-                                return true;
-                            }
-                        }
-                    }
-                    break;
-                case UserScreenType.SixPlayers:
-                    {
-                        int playersUsing = 0;
-                        for (int i = 0; i < players.Count; i++)
-                        {
-                            PlayerInfo p = players[i];
-                            if (p.ScreenIndex == screenIndex)
-                            {
-                                playersUsing++;
-                            }
-                        }
-
-                        if (playersUsing == 6)
-                        {
-                            return false;
-                        }
-
-                        int halfw = (int)(bounds.Width / 3.0f);
-                        int halfh = (int)(bounds.Height / 2.0f);
-
-                        for (int x = 0; x < 3; x++)
-                        {
-                            for (int y = 0; y < 2; y++)
-                            {
-                                Rectangle area = new Rectangle(bounds.X + (halfw * x), bounds.Y + (halfh * y), halfw, halfh);
-
-                                bool goNext = false;
-                                // check if there's any player with the area's x,y coord
-                                for (int i = 0; i < players.Count; i++)
-                                {
-                                    PlayerInfo p = players[i];
-                                    if (p.ScreenIndex == screenIndex)
-                                    {
-                                        //if (p.MonitorBounds.X == area.X &&
-                                        //    p.MonitorBounds.Y == area.Y)
-                                        if (p.MonitorBounds.IntersectsWith(area))
-                                        {
-                                            goNext = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if (goNext)
-                                {
-                                    continue;
-                                }
-                                monitorBounds = area;
-                                int halfwe = (int)(ebounds.Width / 3.0f);
-                                int halfhe = (int)(ebounds.Height / 2.0f);
-                                editorBounds = new Rectangle(ebounds.X + (halfwe * x), ebounds.Y + (halfhe * y), halfwe, halfhe);
-                                return true;
-                            }
-                        }
-                    }
-                    break;
-                case UserScreenType.EightPlayers:
-                    {
-                        int playersUsing = 0;
-                        for (int i = 0; i < players.Count; i++)
-                        {
-                            PlayerInfo p = players[i];
-                            if (p.ScreenIndex == screenIndex)
-                            {
-                                playersUsing++;
-                            }
-                        }
-
-                        if (playersUsing == 8)
-                        {
-                            return false;
-                        }
-
-                        int halfw = (int)(bounds.Width / 4.0f);
-                        int halfh = (int)(bounds.Height / 2.0f);
-
-                        for (int x = 0; x < 4; x++)
-                        {
-                            for (int y = 0; y < 2; y++)
-                            {
-                                Rectangle area = new Rectangle(bounds.X + (halfw * x), bounds.Y + (halfh * y), halfw, halfh);
-
-                                bool goNext = false;
-                                // check if there's any player with the area's x,y coord
-                                for (int i = 0; i < players.Count; i++)
-                                {
-                                    PlayerInfo p = players[i];
-                                    if (p.ScreenIndex == screenIndex)
-                                    {
-                                        //if (p.MonitorBounds.X == area.X &&
-                                        //    p.MonitorBounds.Y == area.Y)
-                                        if (p.MonitorBounds.IntersectsWith(area))
-                                        {
-                                            goNext = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if (goNext)
-                                {
-                                    continue;
-                                }
-                                monitorBounds = area;
-                                int halfwe = (int)(ebounds.Width / 4.0f);
-                                int halfhe = (int)(ebounds.Height / 2.0f);
-                                editorBounds = new Rectangle(ebounds.X + (halfwe * x), ebounds.Y + (halfhe * y), halfwe, halfhe);
-                                return true;
-                            }
-                        }
-                    }
-                    break;
-                case UserScreenType.SixteenPlayers:
-                    {
-                        int playersUsing = 0;
-                        for (int i = 0; i < players.Count; i++)
-                        {
-                            PlayerInfo p = players[i];
-                            if (p.ScreenIndex == screenIndex)
-                            {
-                                playersUsing++;
-                            }
-                        }
-
-                        if (playersUsing == 16)
-                        {
-                            return false;
-                        }
-
-                        int halfw = (int)(bounds.Width / 4.0f);
-                        int halfh = (int)(bounds.Height / 4.0f);
-
-                        for (int x = 0; x < 4; x++)
-                        {
-                            for (int y = 0; y < 4; y++)
-                            {
-                                Rectangle area = new Rectangle(bounds.X + (halfw * x), bounds.Y + (halfh * y), halfw, halfh);
-
-                                bool goNext = false;
-                                // check if there's any player with the area's x,y coord
-                                for (int i = 0; i < players.Count; i++)
-                                {
-                                    PlayerInfo p = players[i];
-                                    if (p.ScreenIndex == screenIndex)
-                                    {
-                                        if (p.MonitorBounds.IntersectsWith(area))
-                                        {
-                                            goNext = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if (goNext)
-                                {
-                                    continue;
-                                }
-                                monitorBounds = area;
-                                int halfwe = (int)(ebounds.Width / 4.0f);
-                                int halfhe = (int)(ebounds.Height / 4.0f);
-                                editorBounds = new Rectangle(ebounds.X + (halfwe * x), ebounds.Y + (halfhe * y), halfwe, halfhe);
-                                return true;
-                            }
-                        }
-                    }
-                    break;
-                case UserScreenType.Custom:
-                    {
-                        int horLines = int.Parse(ini.IniReadValue("CustomLayout", "HorizontalLines"));
-                        int verLines = int.Parse(ini.IniReadValue("CustomLayout", "VerticalLines"));
-                        int maxPlayers = int.Parse(ini.IniReadValue("CustomLayout", "MaxPlayers"));
-
-                        //if(horLines==0)
-                        //{
-                            horLines++;
-                        //}
-                        //if(verLines==0)
-                        //{
-                            verLines++;
-                        //}
-
-                        int playersUsing = 0;
-                        for (int i = 0; i < players.Count; i++)
-                        {
-                            PlayerInfo p = players[i];
-                            if (p.ScreenIndex == screenIndex)
-                            {
-                                playersUsing++;
-                            }
-                        }
-
-                        if (playersUsing == maxPlayers)
-                        {
-                            return false;
-                        }
-
-                        int halfw = (int)(bounds.Width / (float)verLines);
-                        int halfh = (int)(bounds.Height / (float)horLines);
-
-
-                        for (int x = 0; x < verLines; x++)
-                        {
-                            for (int y = 0; y < horLines; y++)
-                            {
-                                Rectangle area = new Rectangle(bounds.X + (halfw * x), bounds.Y + (halfh * y), halfw, halfh);
-
-                                bool goNext = false;
-                                // check if there's any player with the area's x,y coord
-                                for (int i = 0; i < players.Count; i++)
-                                {
-                                    PlayerInfo p = players[i];
-                                    if (p.ScreenIndex == screenIndex)
-                                    {
-                                        if (p.MonitorBounds.IntersectsWith(area))
-                                        {
-                                            goNext = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if (goNext)
-                                {
-                                    continue;
-                                }
-                                monitorBounds = area;
-                                int halfwe = (int)(ebounds.Width / (float)verLines);
-                                int halfhe = (int)(ebounds.Height / (float)horLines);
-                                editorBounds = new Rectangle(ebounds.X + (halfwe * x), ebounds.Y + (halfhe * y), halfwe, halfhe);
-                                return true;
-                            }
-                        }
-                    }
-                    break;
-            }
-            return false;
+			return false;
         }
 
         protected override void OnMouseDoubleClick(MouseEventArgs e)
@@ -1043,7 +818,7 @@ namespace Nucleus.Coop
 
                             Rectangle? editor;
                             Rectangle? monitor;
-                            bool hasFreeSpace = GetFreeSpace(i, out editor, out monitor);
+                            bool hasFreeSpace = GetFreeSpace(i, out editor, out monitor, player);
 
                             if (hasFreeSpace)
                             {
@@ -1340,6 +1115,7 @@ namespace Nucleus.Coop
                 var players = profile.PlayerData;
 
                 PlayerInfo player = players[draggingIndex];
+                
                 Rectangle p = player.EditBounds;
                 if (draggingScreen == -1)
                 {
@@ -1358,7 +1134,7 @@ namespace Nucleus.Coop
                             var playas = profile.PlayerData;
                             Rectangle? editor;
                             Rectangle? monitor;
-                            GetFreeSpace(i, out editor, out monitor);
+                            GetFreeSpace(i, out editor, out monitor, player);
 
                             if (editor != null)
                             {
@@ -1501,6 +1277,7 @@ namespace Nucleus.Coop
                 {
                     
                     PlayerInfo info = players[i];
+
                     //MessageBox.Show("Game name: " + ggi.GameName + "\nDInputEnabled: " + ggi.Hook.DInputEnabled + "\nDInputForceDisable: " + ggi.Hook.DInputForceDisable + "\nXInputReroute: " + ggi.Hook.XInputReroute + "\nPlayers count: " + players.Count + "\n\nController Name: " + info.GamepadName + "\nHID Device ID: " + info.HIDDeviceID + "\nInstance GUID: " + info.GamepadGuid + "\nSlot: " + i + "\nIsXInput: " + info.IsXInput + "\nIsDInput: " + info.IsDInput + "\nIsKeyboardPlayer: " + info.IsKeyboardPlayer + "\nRaw hid: " + info.DInputJoystick.Properties.InterfacePath);
                     Rectangle s = info.EditBounds;
                     g.ResetClip();
@@ -1524,9 +1301,10 @@ namespace Nucleus.Coop
                         GamepadButtonFlags flags = (GamepadButtonFlags)info.GamepadMask;
                         //g.DrawString(flags.ToString(), smallTextFont, Brushes.White, new PointF(loc.X, loc.Y + gamepadRect.Height * 0.01f));
 
-                        if(ini.IniReadValue("ControllerMapping",info.HIDDeviceID) != "")
+                        if /*(!string.IsNullOrEmpty(info.Nickname)) */ (ini.IniReadValue("ControllerMapping",info.HIDDeviceID) != "")
                         {
                             str = ini.IniReadValue("ControllerMapping", info.HIDDeviceID);
+                            //str = info.Nickname;
                             size = g.MeasureString(str, playerCustomFont);
                             loc = RectangleUtil.Center(size, s);
                             loc.Y -= 10;
@@ -1538,16 +1316,30 @@ namespace Nucleus.Coop
                         }
                         g.DrawImage(gamepadImg, gamepadRect);
                     }
-                    else if (info.IsKeyboardPlayer)
+                    else if (info.IsKeyboardPlayer && !info.IsRawKeyboard && !info.IsRawMouse)
                     {
                         g.DrawImage(keyboardImg, gamepadRect);
                     }
-                    else
+					else if (info.IsRawKeyboard || info.IsRawMouse)
+					{
+						var img = info.IsRawKeyboard ? rawKeyboardImg : rawMouseImg;
+
+						if (info.ShouldFlash)
+						{
+							g.DrawImage(img, gamepadRect, 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, flashImageAttributes);
+						}
+						else
+						{
+							g.DrawImage(img, gamepadRect);
+						}
+					}
+					else
                     {
                         loc.Y -= gamepadRect.Height * 0.2f;
-                        if (ini.IniReadValue("ControllerMapping", info.HIDDeviceID) != "")
+                        if /*(!string.IsNullOrEmpty(info.Nickname))*/ (ini.IniReadValue("ControllerMapping", info.HIDDeviceID) != "")
                         {
                             str = ini.IniReadValue("ControllerMapping", info.HIDDeviceID);
+                            //str = info.Nickname;
                             size = g.MeasureString(str, playerCustomFont);
                             loc = RectangleUtil.Center(size, s);
                             loc.Y -= 10;
@@ -1582,10 +1374,10 @@ namespace Nucleus.Coop
                 g.DrawRectangle(Pens.Red, draggingScreenRec);
             }
 
-            g.DrawString("Gamepads", playerTextFont, Brushes.White, new PointF(10, 10));
+            g.DrawString(game.Game.SupportsMultipleKeyboardsAndMice ? "Input Devices" : "Gamepads", playerTextFont, Brushes.White, new PointF(10, 10));
 
             SizeF dragEachGamepadSize;
-            string dragEachGamepad = "Drag each gamepad to a screen\nClick top-left corner to change layout\nRight click player to change size";
+            string dragEachGamepad = $"Drag each {((game.Game.SupportsMultipleKeyboardsAndMice || game.Game.SupportsKeyboard) ? "input device" : "gamepad")} to a screen\nClick top-left corner to change layout\nRight click player to change size";
             dragEachGamepad = StringUtil.WrapString(Width /** 0.3f*/, dragEachGamepad, g, extraSmallTextFont, out dragEachGamepadSize);
             g.DrawString(dragEachGamepad, extraSmallTextFont, Brushes.White, new PointF(Width - dragEachGamepadSize.Width, 4/*playersArea.Y - 50*/));
 

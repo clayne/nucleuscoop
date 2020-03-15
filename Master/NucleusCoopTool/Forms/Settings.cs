@@ -12,6 +12,9 @@ using Nucleus.Gaming;
 using System.Text.RegularExpressions;
 using SlimDX.DirectInput;
 using System.Runtime.InteropServices;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using Nucleus.Gaming.Coop.InputManagement;
 
 namespace Nucleus.Coop
 {
@@ -45,9 +48,28 @@ namespace Nucleus.Coop
 
             mainForm = mf as MainForm;
             positionsControl = pc;
-            
+
+            RefreshCmbNetwork();
+            if (ini.IniReadValue("Misc", "Network") != "")
+            {
+                cmb_Network.Text = ini.IniReadValue("Misc", "Network");
+            }
+            else
+            {
+                cmb_Network.SelectedIndex = 0;
+            }
+
+            if (ini.IniReadValue("Misc", "SteamLang") != "")
+            {
+                cmb_Lang.Text = ini.IniReadValue("Misc", "SteamLang");
+            }
+            else
+            {
+                cmb_Lang.SelectedIndex = 0;
+            }
+
             //Hotkeys
-            if(ini.IniReadValue("Hotkeys", "Close").Contains('+'))
+            if (ini.IniReadValue("Hotkeys", "Close").Contains('+'))
             {
                 string[] closeHk = ini.IniReadValue("Hotkeys", "Close").Split('+');
                 if((closeHk[0] == "Ctrl" || closeHk[0] == "Alt" || closeHk[0] == "Shift") && closeHk[1].Length == 1 && Regex.IsMatch(closeHk[1], @"^[a-zA-Z0-9]+$"))
@@ -87,6 +109,11 @@ namespace Nucleus.Coop
 
             //Controll
             GetControllers();
+
+            if (ini.IniReadValue("ControllerMapping", "Keyboard") != "")
+            {
+                keyboardNick.Text = ini.IniReadValue("ControllerMapping", "Keyboard");
+            }
 
             //Custom Layout
             //if (ini.IniReadValue("CustomLayout", "Enabled") != "")
@@ -150,8 +177,10 @@ namespace Nucleus.Coop
                 tbox.Clear();
             }
 
+
             dinput = new DirectInput();
             IList<DeviceInstance> devices = dinput.GetDevices(DeviceClass.GameController, DeviceEnumerationFlags.AttachedOnly);
+            int gcDevicesCnt = devices.Count;
             for (int i = 0; i < devices.Count; i++)
             {
                 DeviceInstance device = devices[i];
@@ -168,6 +197,31 @@ namespace Nucleus.Coop
                 gamePad.Dispose();
             }
             dinput.Dispose();
+            
+            
+            foreach (var device in RawInputManager.GetDeviceList().Where(x => x.deviceInfo.dwType <= 1))
+            {
+
+                //string hid = device.deviceInfo.hid.ToString();
+                //int start = hid.IndexOf("hid#");
+                //int end = hid.LastIndexOf("#{");
+                //string fhid = hid.Substring(start, end - start).Replace('#', '\\').ToUpper();
+
+                //controllerGuids[gcDevicesCnt].Text = fhid;
+                string did = string.Empty;
+                if(device.deviceInfo.dwType == 0)
+                {
+                    did = "T" + device.deviceInfo.dwType + "PID" + device.deviceInfo.hid.dwProductId + "VID" + device.deviceInfo.hid.dwVendorId + "VN" + device.deviceInfo.hid.dwVersionNumber;
+                    controllerGuids[gcDevicesCnt].Text = did;
+                    gcDevicesCnt++;
+                }
+                
+
+                if (ini.IniReadValue("ControllerMapping", did) != "")
+                {
+                    controllerNicks[gcDevicesCnt].Text = ini.IniReadValue("ControllerMapping", did);
+                }
+            }
         }
 
         private void SettingsSaveBtn_Click(object sender, EventArgs e)
@@ -192,7 +246,7 @@ namespace Nucleus.Coop
 
                 for(int i =0; i < controllerGuids.Length; i++)
                 {
-                    if (!string.IsNullOrEmpty(controllerGuids[i].Text) && !string.IsNullOrEmpty(controllerNicks[i].Text))
+                    if (!string.IsNullOrEmpty(controllerGuids[i].Text)) //&& !string.IsNullOrEmpty(controllerNicks[i].Text))
                     {
                         ini.IniWriteValue("ControllerMapping", controllerGuids[i].Text, controllerNicks[i].Text);
                     }
@@ -202,13 +256,22 @@ namespace Nucleus.Coop
                     positionsControl.Refresh();
                 }
 
+                if(!string.IsNullOrEmpty(keyboardNick.Text))
+                {
+                    ini.IniWriteValue("ControllerMapping", "Keyboard", keyboardNick.Text);
+                }
+
                 ini.IniWriteValue("Misc", "UseNicksInGame", useNicksCheck.Checked.ToString());
                 ini.IniWriteValue("Misc", "DebugLog", debugLogCheck.Checked.ToString());
+                ini.IniWriteValue("Misc", "Network", cmb_Network.SelectedItem.ToString());
+                ini.IniWriteValue("Misc", "SteamLang", cmb_Lang.SelectedItem.ToString());
 
                 //ini.IniWriteValue("CustomLayout", "Enabled", enableCustomCheckbox.Checked.ToString());
                 ini.IniWriteValue("CustomLayout", "HorizontalLines", numHorDiv.Value.ToString());
                 ini.IniWriteValue("CustomLayout", "VerticalLines", numVerDiv.Value.ToString());
                 ini.IniWriteValue("CustomLayout", "MaxPlayers", numMaxPlyrs.Value.ToString());
+
+                
 
                 //ini.IniWriteValue("Misc", "VibrateOpen", check_Vibrate.Checked.ToString());
 
@@ -298,7 +361,30 @@ namespace Nucleus.Coop
 
         private void Btn_credits_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("NucleusCoop Mod - " + mainForm.version + "\n\nCredits\n---------------------------------------------------------------------\nOriginal NucleusCoop Project: Lucas Assis (lucasassislar)\nMod: ZeroFox\n\nThis mod brings further enhancements to NucleusCoop, such as:\n- HUGE increase to the amount of compabitle games\n- Much more customization (via game scripts)\n- 6 and 8 player support\n- Quality of life improvements\n- Bug fixes\n- And more!\n\nFull mod changelog in Mod-Readme.txt\n\nAll this wouldn't have been possible without Lucas. Thank you Lucas <3. Make split-screen great again!\n\nSpecial thanks to: Talos91, Ilyaki and the Splitscreen Dreams discord.", "Credits",MessageBoxButtons.OK,MessageBoxIcon.Information);
+            MessageBox.Show("NucleusCoop Mod - " + mainForm.version + 
+                "\n" +
+                "\nCredits" +
+                "\n---------------------------------------------------------------------" +
+                "\nOriginal NucleusCoop Project: Lucas Assis (lucasassislar)" +
+                "\nMod: ZeroFox" +
+                "\nMultiple keyboards/mice & hooks: Ilyaki" +
+                "\nWebsite & handler API: r-mach" +
+                "\n" +
+                "\nAdditional credits to all original developers of third party utilities Nucleus uses:" +
+                "\nMr_Goldberg (Goldberg Emulator), syahmixp (SmartSteamEmu), EJocys (x360ce), 0dd14 Lab (Xinput Plus), r1ch (ForceBindIP), HaYDeN (Flawless Widescreen), briankendall (devreorder), VerGreeneyes (DirectXWrapper)" +
+                "\n" +
+                "\nThis mod brings further enhancements to NucleusCoop, such as:" +
+                "\n- Huge increase to the amount of compabitle games" +
+                "\n- Much more customization (via game scripts)" +
+                "\n- Support for any number of players" +
+                "\n- Quality of life improvements" +
+                "\n- Bug fixes\n- And so much more!" +
+                "\n" +
+                "\nFull mod changelog in Mod-Readme.txt" +
+                "\n" +
+                "\nAll this wouldn't have been possible without Lucas. Thank you Lucas <3" +
+                "\n" +
+                "\nSpecial thanks to: Talos91, PoundlandBacon and the rest of the Splitscreen Dreams discord community.", "Credits",MessageBoxButtons.OK,MessageBoxIcon.Information);
         }
 
         private void NumHorDiv_ValueChanged(object sender, EventArgs e)
@@ -378,6 +464,41 @@ namespace Nucleus.Coop
 
             p.Dispose();
             gs.Dispose();
+        }
+
+        private void cmb_Network_DropDown(object sender, EventArgs e)
+        {
+            RefreshCmbNetwork();
+        }
+
+        private void RefreshCmbNetwork()
+        {
+            cmb_Network.Items.Clear();
+
+            cmb_Network.Items.Add("Automatic");
+
+            var ni = NetworkInterface.GetAllNetworkInterfaces();
+            foreach (NetworkInterface item in ni)
+            {
+                if (item.OperationalStatus == OperationalStatus.Up)
+                {
+                    foreach (UnicastIPAddressInformation ip in item.GetIPProperties().UnicastAddresses)
+                    {
+                        if (ip.Address.AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            cmb_Network.Items.Add(item.Name);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void cmb_Network_DropDownClosed(object sender, EventArgs e)
+        {
+            if(cmb_Network.SelectedItem == null)
+            {
+                cmb_Network.SelectedIndex = 0;
+            }
         }
     }
 }
