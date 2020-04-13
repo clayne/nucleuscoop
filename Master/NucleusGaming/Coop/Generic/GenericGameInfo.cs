@@ -187,6 +187,21 @@ namespace Nucleus.Gaming
         public bool KillLastInstanceMutex;
         public bool RefreshWindowAfterStart = false;
         public bool CreateSingleDeviceFile;
+        public bool KillMutexAtEnd;
+        public bool CMDStartArgsInside;
+        public bool UseEACBypass;
+        public bool LaunchAsDifferentUsers;
+        public bool RunLauncherAndExe;
+        public int PauseBetweenProcessGrab;
+        public int PauseBetweenContextAndLaunch;
+        public bool DirSymlinkCopyInsteadIncludeSubFolders;
+        public bool LaunchAsDifferentUsersAlt;
+        public bool ChangeIPPerInstanceAlt;
+        public bool GamePlayAfterLaunch;
+        public bool UserProfileConfigPathNoCopy;
+        public bool UserProfileSavePathNoCopy;
+        public bool LauncherExeIgnoreFileCheck;
+
 
         // -- From USS
         //Effectively a switch for all of USS features
@@ -214,6 +229,8 @@ namespace Nucleus.Gaming
 		public bool ForwardRawKeyboardInput = false;
 		public bool ForwardRawMouseInput = false;
 		public bool DrawFakeMouseCursor = true;
+		public bool DrawFakeMouseCursorForControllers = false;
+		public bool UpdateFakeMouseWithInternalInput = false;
 		public bool LockInputAtStart = false;
 		public bool PreventGameFocus = false;
 		public int LockInputToggleKey = 0x23;//End by default. Keys: https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes

@@ -2,6 +2,7 @@
 using Nucleus.Gaming.Coop;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -11,6 +12,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Xml;
 
 namespace Nucleus.Gaming
@@ -89,8 +91,9 @@ namespace Nucleus.Gaming
         public int PlayersPerInstance;
         public bool UseDevReorder;
 
-        [DllImport("iphlpapi.dll", CharSet = CharSet.Auto)]
-        private static extern int GetBestInterface(UInt32 destAddr, out UInt32 bestIfIndex);
+        private List<string> regKeyPaths = new List<string>();
+
+
 
         public Type HandlerType
         {
@@ -188,11 +191,39 @@ namespace Nucleus.Gaming
             }
         }
 
-        public int OrigAspectRatio
+        public double OrigAspectRatioDecimal
         {
             get
             {
-                return profile.Screens[pInfo.PlayerID].display.Width / profile.Screens[pInfo.PlayerID].display.Height;
+                return (double)profile.Screens[pInfo.PlayerID].display.Width / profile.Screens[pInfo.PlayerID].display.Height;
+            }
+        }
+
+        public string OrigAspectRatio
+        {
+            get
+            {
+                int width = profile.Screens[pInfo.PlayerID].display.Width;
+                int height = profile.Screens[pInfo.PlayerID].display.Height;
+                var gcd = GCD(width, height);
+                return string.Format("{0}:{1}", width / gcd, height / gcd);
+            }
+        }
+
+        public double AspectRatioDecimal
+        {
+            get
+            {
+                return (double)Width / Height;
+            }
+        }
+
+        public string AspectRatio
+        {
+            get
+            {
+                var gcd = GCD(Width, Height);
+                return string.Format("{0}:{1}", Width / gcd, Height / gcd);
             }
         }
 
@@ -231,12 +262,14 @@ namespace Nucleus.Gaming
                 //    IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
                 //    localIP = endPoint.Address.ToString();
                 //}
-                
-                var dadada = GetBestInterface(BitConverter.ToUInt32(IPAddress.Parse("8.8.8.8").GetAddressBytes(), 0), out uint interfaceIndex);
-                IPAddress xxxd = NetworkInterface.GetAllNetworkInterfaces()
-                                .Where(netInterface => netInterface.GetIPProperties().GetIPv4Properties().Index == BitConverter.ToInt32(BitConverter.GetBytes(interfaceIndex), 0)).First().GetIPProperties().UnicastAddresses.Where(ipAdd => ipAdd.Address.AddressFamily == AddressFamily.InterNetwork).First().Address;
 
-                return xxxd.ToString();
+                //var dadada = GetBestInterface(BitConverter.ToUInt32(IPAddress.Parse("8.8.8.8").GetAddressBytes(), 0), out uint interfaceIndex);
+                //IPAddress xxxd = NetworkInterface.GetAllNetworkInterfaces()
+                //                .Where(netInterface => netInterface.GetIPProperties().GetIPv4Properties().Index == BitConverter.ToInt32(BitConverter.GetBytes(interfaceIndex), 0)).First().GetIPProperties().UnicastAddresses.Where(ipAdd => ipAdd.Address.AddressFamily == AddressFamily.InterNetwork).First().Address;
+
+                //return xxxd.ToString();
+
+                return parent.GetLocalIP();
             }
         }
 
@@ -277,6 +310,146 @@ namespace Nucleus.Gaming
 
             get; set;
         }
+
+        public void RunAdditionalFiles(string[] filePaths, bool changeWorkingDir, int secondsToPauseInbetween)
+        {
+            for (int fileIndex = 0; fileIndex<filePaths.Length; fileIndex++)
+            {
+                string fileName = filePaths[fileIndex];
+                if(fileName.Contains('|'))
+                {
+                    string[] fileNameSplit = fileName.Split('|');
+                    fileName = fileNameSplit[1];
+
+                    if(fileNameSplit[0].ToLower() != "all")
+                    {
+                        if (int.Parse(fileNameSplit[0]) != (pInfo.PlayerID - 1))
+                        {
+                            continue;
+                        }
+                    }
+}
+                else
+                {
+                    if(pInfo.PlayerID > 0)
+                    {
+                        continue;
+                    }
+                }
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.FileName = fileName;
+                psi.UseShellExecute = false;
+                if(changeWorkingDir)
+                {
+                    psi.WorkingDirectory = GameManager.Instance.GetAppContentPath() + "\\AdditionalFiles";
+                }
+                else
+                {
+                    psi.WorkingDirectory = Path.GetDirectoryName(fileName);
+                }
+
+                Process.Start(psi);
+
+                if(fileIndex<(filePaths.Length - 1) && secondsToPauseInbetween > 0)
+                {
+                    Thread.Sleep(TimeSpan.FromSeconds(secondsToPauseInbetween));
+                }
+            }
+        }
+
+        public void RunAdditionalFiles(string[] filePaths, bool changeWorkingDir, int secondsToPauseInbetween, bool runAsAdmin)
+        {
+            for (int fileIndex = 0; fileIndex < filePaths.Length; fileIndex++)
+            {
+                string fileName = filePaths[fileIndex];
+                if (fileName.Contains('|'))
+                {
+                    string[] fileNameSplit = fileName.Split('|');
+                    fileName = fileNameSplit[1];
+
+                    if (fileNameSplit[0].ToLower() != "all")
+                    {
+                        if (int.Parse(fileNameSplit[0]) != (pInfo.PlayerID - 1))
+                        {
+                            continue;
+                        }
+                    }
+                }
+                else
+                {
+                    if (pInfo.PlayerID > 0)
+                    {
+                        continue;
+                    }
+                }
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.FileName = fileName;
+                psi.UseShellExecute = false;
+                if (changeWorkingDir)
+                {
+                    psi.WorkingDirectory = GameManager.Instance.GetAppContentPath() + "\\AdditionalFiles";
+                }
+                else
+                {
+                    psi.WorkingDirectory = Path.GetDirectoryName(fileName);
+                }
+                if(runAsAdmin)
+                {
+                    psi.UseShellExecute = true;
+                    psi.Verb = "runas";
+                }
+
+                Process.Start(psi);
+
+                if (fileIndex < (filePaths.Length - 1) && secondsToPauseInbetween > 0)
+                {
+                    Thread.Sleep(TimeSpan.FromSeconds(secondsToPauseInbetween));
+                }
+            }
+        }
+
+        static int GCD(int a, int b)
+        {
+            return b == 0 ? Math.Abs(a) : GCD(b, a % b);
+        }
+
+        public void ModifiedDate(string file, int year, int month, int day, int hour, int minute, int second)
+        {
+            DateTime dt = new DateTime(year, month, day, hour, minute, second);
+            File.SetLastWriteTime(file, dt);
+        }
+
+        public void ModifiedDate(string file, int year, int month, int day)
+        {
+            DateTime dt = new DateTime(year, month, day, 0, 0, 0);
+            File.SetLastWriteTime(file, dt);
+        }
+
+        public void CreatedDate(string file, int year, int month, int day, int hour, int minute, int second)
+        {
+            DateTime dt = new DateTime(year, month, day, hour, minute, second);
+            File.SetCreationTime(file, dt);
+        }
+
+        public void CreatedDate(string file, int year, int month, int day)
+        {
+            DateTime dt = new DateTime(year, month, day, 0, 0, 0);
+            File.SetCreationTime(file, dt);
+        }
+
+        public string[] FindFiles(string rootFolder, string fileName)
+        {
+            string[] files = Directory.GetFiles(rootFolder, fileName, SearchOption.TopDirectoryOnly);
+            return files;
+        }
+
+        public string[] FindFiles(string rootFolder, string fileName, bool searchAll)
+        {
+            SearchOption searchOp = searchAll ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            string[] files = Directory.GetFiles(rootFolder, fileName, searchOp);
+            return files;
+        }
+
 
         public void WriteTextFile(string path, string[] lines)
         {
@@ -352,7 +525,7 @@ namespace Nucleus.Gaming
 
         public void RemoveLineInTextFile(string path, int lineNum, string encoder)
         {
-            string[] lines = File.ReadAllLines(path);
+            string[] lines = File.ReadAllLines(path, Encoding.GetEncoding(encoder));
             if (lineNum < 0 || lineNum > lines.Length)
             {
                 return;
@@ -422,7 +595,7 @@ namespace Nucleus.Gaming
 
         public void RemoveLineInTextFile(string path, string searchValue, SearchType type, string encoder)
         {
-            string[] lines = File.ReadAllLines(path);
+            string[] lines = File.ReadAllLines(path, Encoding.GetEncoding(encoder));
             if (File.Exists(path))
             {
                 File.Delete(path);
@@ -498,7 +671,7 @@ namespace Nucleus.Gaming
 
         public void ReplaceLinesInTextFile(string path, string[] newLines, string encoder)
         {
-            string[] lines = File.ReadAllLines(path);
+            string[] lines = File.ReadAllLines(path, Encoding.GetEncoding(encoder));
             if (File.Exists(path))
             {
                 File.Delete(path);
@@ -552,7 +725,7 @@ namespace Nucleus.Gaming
 
         public void ReplacePartialLinesInTextFile(string path, string[] newLines, string encoder)
         {
-            string[] lines = File.ReadAllLines(path);
+            string[] lines = File.ReadAllLines(path, Encoding.GetEncoding(encoder));
             if (File.Exists(path))
             {
                 File.Delete(path);
@@ -782,23 +955,91 @@ namespace Nucleus.Gaming
             }
         }
 
-        public void DeleteRegKey(string baseKey, string sKey, string subKey)
+        void ExportRegistry(string strKey, string filepath)
         {
-            if (baseKey == "HKEY_LOCAL_MACHINE" || baseKey == "HKEY_CURRENT_USER")
+            try
             {
-                if (baseKey == "HKEY_LOCAL_MACHINE")
+                using (Process proc = new Process())
                 {
-                    RegistryKey key = Registry.LocalMachine.OpenSubKey(sKey, true);
-                    key.DeleteSubKey(subKey);
-                    key.Close();
-                }
-                else
-                {
-                    RegistryKey key = Registry.CurrentUser.OpenSubKey(sKey, true);
-                    key.DeleteSubKey(subKey);
-                    key.Close();
+                    proc.StartInfo.FileName = "reg.exe";
+                    proc.StartInfo.UseShellExecute = false;
+                    proc.StartInfo.RedirectStandardOutput = true;
+                    proc.StartInfo.RedirectStandardError = true;
+                    proc.StartInfo.CreateNoWindow = true;
+                    proc.StartInfo.Arguments = "export \"" + strKey + "\" \"" + filepath + "\" /y";
+                    proc.Start();
+                    string stdout = proc.StandardOutput.ReadToEnd();
+                    string stderr = proc.StandardError.ReadToEnd();
+                    proc.WaitForExit();
                 }
             }
+            catch (Exception ex)
+            {
+                // handle exception
+            }
+        }
+
+        public void DeleteRegKey(string baseKey, string sKey, string subKey)
+        {
+            if (baseKey != "HKEY_LOCAL_MACHINE" && baseKey != "HKEY_CURRENT_USER" && baseKey != "HKEY_USERS")
+            {
+                return;
+            }
+
+            RegistryKey key = null;
+            switch (baseKey)
+            {
+                case "HKEY_LOCAL_MACHINE":
+                    key = Registry.LocalMachine.OpenSubKey(sKey, true);
+                    break;
+                case "HKEY_CURRENT_USER":
+                    key = Registry.CurrentUser.OpenSubKey(sKey, true);
+                    break;
+                case "HKEY_USERS":
+                    key = Registry.Users.OpenSubKey(sKey, true);
+                    break;
+            }
+
+            string fullKeyPath = baseKey + "\\" + sKey;
+            if (!regKeyPaths.Contains(fullKeyPath) && key != null)
+            {
+                regKeyPaths.Add(fullKeyPath);
+                ExportRegistry(baseKey + "\\" + sKey, Directory.GetCurrentDirectory() + "\\utils\\backup\\" + sKey.Substring(sKey.LastIndexOf('\\') + 1) + ".reg");
+            }
+
+            key.DeleteSubKey(subKey);
+            key.Close();
+        }
+
+        public string ReadRegKey(string baseKey, string sKey, string subKey)
+        {
+            if (baseKey != "HKEY_LOCAL_MACHINE" && baseKey != "HKEY_CURRENT_USER" && baseKey != "HKEY_USERS")
+            {
+                return string.Empty;
+            }
+
+            RegistryKey key = null;
+            switch (baseKey)
+            {
+                case "HKEY_LOCAL_MACHINE":
+                    key = Registry.LocalMachine.OpenSubKey(sKey);
+                    break;
+                case "HKEY_CURRENT_USER":
+                    key = Registry.CurrentUser.OpenSubKey(sKey);
+                    break;
+                case "HKEY_USERS":
+                    key = Registry.Users.OpenSubKey(sKey);
+                    break;
+            }
+
+            if(key != null)
+            {
+                return key.GetValue(subKey).ToString();
+            }
+            else
+            {
+                return null;
+            }   
         }
 
         public void EditRegKey(string baseKey, string sKey, string subKey, object value, RegType regType)
@@ -813,46 +1054,60 @@ namespace Nucleus.Gaming
             //String = 1,
             //Unknown = 0
 
+            if ((baseKey != "HKEY_LOCAL_MACHINE" && baseKey != "HKEY_CURRENT_USER" && baseKey != "HKEY_USERS") || value == null)
+            {
+                return;
+            }
+
+            string val = value.ToString();
+
+            RegistryKey key = null;
+            switch (baseKey)
+            {
+                case "HKEY_LOCAL_MACHINE":
+                    key = Registry.LocalMachine.OpenSubKey(sKey, true);
+                    break;
+                case "HKEY_CURRENT_USER":
+                    key = Registry.CurrentUser.OpenSubKey(sKey, true);
+                    break;
+                case "HKEY_USERS":
+                    key = Registry.Users.OpenSubKey(sKey, true);
+                    break;
+            }
+
+            string fullKeyPath = baseKey + "\\" + sKey;
+            if (!regKeyPaths.Contains(fullKeyPath) && key != null)
+            {
+                regKeyPaths.Add(fullKeyPath);
+                ExportRegistry(baseKey + "\\" + sKey, Directory.GetCurrentDirectory() + "\\utils\\backup\\" + sKey.Substring(sKey.LastIndexOf('\\') + 1) + ".reg");
+            }
+
+            if(key == null)
+            {
+                switch (baseKey)
+                {
+                    case "HKEY_LOCAL_MACHINE":
+                        key = Registry.LocalMachine.CreateSubKey(sKey, true);
+                        break;
+                    case "HKEY_CURRENT_USER":
+                        key = Registry.CurrentUser.CreateSubKey(sKey, true);
+                        break;
+                    case "HKEY_USERS":
+                        key = Registry.Users.CreateSubKey(sKey, true);
+                        break;
+                }
+            }
+
             if (regType == RegType.Binary)
             {
-                string val = value.ToString();
                 byte[] bytes = Encoding.UTF8.GetBytes(val);
-                if (baseKey == "HKEY_LOCAL_MACHINE" || baseKey == "HKEY_CURRENT_USER")
-                {
-                    if (baseKey == "HKEY_LOCAL_MACHINE")
-                    {
-                        RegistryKey key = Registry.LocalMachine.OpenSubKey(sKey, true);
-                        key.SetValue(subKey, bytes, (RegistryValueKind)(int)regType);
-                        key.Close();
-                    }
-                    else
-                    {
-                        RegistryKey key = Registry.CurrentUser.OpenSubKey(sKey, true);
-                        key.SetValue(subKey, bytes, (RegistryValueKind)(int)regType);
-                        key.Close();
-                    }
-
-                }
+                key.SetValue(subKey, bytes, (RegistryValueKind)(int)regType);
             }
             else
             {
-                if (baseKey == "HKEY_LOCAL_MACHINE" || baseKey == "HKEY_CURRENT_USER")
-                {
-                    if (baseKey == "HKEY_LOCAL_MACHINE")
-                    {
-                        RegistryKey key = Registry.LocalMachine.OpenSubKey(sKey, true);
-                        key.SetValue(subKey, value, (RegistryValueKind)(int)regType);
-                        key.Close();
-                    }
-                    else
-                    {
-                        RegistryKey key = Registry.CurrentUser.OpenSubKey(sKey, true);
-                        key.SetValue(subKey, value, (RegistryValueKind)(int)regType);
-                        key.Close();
-                    }
-
-                }
+                key.SetValue(subKey, value, (RegistryValueKind)(int)regType);
             }
+            key.Close();
         }
 
         public void KillProcessesMatchingWindowName(string name)

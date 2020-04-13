@@ -37,6 +37,12 @@ std::ofstream outfile;
 std::wstring nucleusFolder;
 std::wstring logFile = L"\\debug-log-startup-hook.txt";
 std::wstring rawHid;
+std::string playerNick;
+
+int width;
+int height;
+int posx;
+int posy;
 
 //std::wstring rawHid;
 
@@ -418,22 +424,22 @@ UINT WINAPI GetRawInputDeviceList_Hook(PRAWINPUTDEVICELIST pRawInputDeviceList, 
 {
 	*puiNumDevices = 0;
 
-//#define MAX_CONTROLLERS 4
-//
-//	HMODULE xinput_lib = LoadLibrary("xinput1_3.dll");
-//
-//	XInputGetStateExProc XInputGetStateEx;
-//	int XInputGetStateExOrdinal = 100;
-//	XInputGetStateEx = (XInputGetStateExProc)GetProcAddress(xinput_lib, (LPCTSTR)XInputGetStateExOrdinal);
-//
-//	for (DWORD i = 0; i < MAX_CONTROLLERS; i++)
-//	{
-//		XINPUT_STATE state;
-//		ZeroMemory(&state, sizeof(XINPUT_STATE));
-//		DWORD dwResult = XInputGetState(i, &state);
-//		ZeroMemory(&state, sizeof(XINPUT_STATE));
-//		DWORD dwResultEx = XInputGetStateEx(i, &state);
-//	}
+	//#define MAX_CONTROLLERS 4
+	//
+	//	HMODULE xinput_lib = LoadLibrary("xinput1_3.dll");
+	//
+	//	XInputGetStateExProc XInputGetStateEx;
+	//	int XInputGetStateExOrdinal = 100;
+	//	XInputGetStateEx = (XInputGetStateExProc)GetProcAddress(xinput_lib, (LPCTSTR)XInputGetStateExOrdinal);
+	//
+	//	for (DWORD i = 0; i < MAX_CONTROLLERS; i++)
+	//	{
+	//		XINPUT_STATE state;
+	//		ZeroMemory(&state, sizeof(XINPUT_STATE));
+	//		DWORD dwResult = XInputGetState(i, &state);
+	//		ZeroMemory(&state, sizeof(XINPUT_STATE));
+	//		DWORD dwResultEx = XInputGetStateEx(i, &state);
+	//	}
 
 	return 0; //GetRawInputDeviceList(pRawInputDeviceList, puiNumDevices, cbSize);
 }
@@ -487,6 +493,107 @@ UINT WINAPI GetRegisteredRawInputDevices_Hook(PRAWINPUTDEVICE pRawInputDevices, 
 
 BOOL WINAPI SetWindowPos_Hook(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags)
 {
+	//if ((X == posx && Y == posy && cx == width && cy == height) || (X == 0 && Y == 0 && cx == 0 && cy == 0))
+	//{
+	//	return true;
+	//}
+	//else
+	//{
+	//	return false;
+	//}
+
+	bool result = SetWindowPos(hWnd, hWndInsertAfter, posx, posy, width, height, uFlags);
+
+	return result;
+}
+
+BOOL WINAPI RegisterUserApiHook_Hook(HINSTANCE hInstance, FARPROC CallbackFunc)
+{
+	if (IsDebug)
+	{
+		outfile.open(nucleusFolder + logFile, std::ios_base::app);
+		outfile << date_string() << "SHOOK: REGISTERUSERAPIHOOK \n";
+		outfile.close();
+	}
+
+	return false;
+}
+
+FARPROC WINAPI GetProcAddress_Hook(HMODULE hModule, LPCSTR lpProcName)
+{
+	if (((DWORD)lpProcName >> 16) == 0) //Check if Ordinal
+	{
+		//do stuff to hook your wanted method in case you think it is being requested by ordinal
+
+		if (LOWORD(lpProcName) == 0x958) { //SetWindowPos Ordinal Win10x64
+
+			if (IsDebug)
+			{
+				outfile.open(nucleusFolder + logFile, std::ios_base::app);
+				outfile << date_string() << "SHOOK: ORDINAL\n";
+				outfile.close();
+			}
+
+		}
+
+	}
+	else
+	{
+		if (strcmp(lpProcName, "SetWindowPos") == 0) {
+			if (IsDebug)
+			{
+				outfile.open(nucleusFolder + logFile, std::ios_base::app);
+				outfile << date_string() << "SHOOK: " << lpProcName << " " << hModule << "\n";
+				outfile.close();
+
+				char path[MAX_PATH];
+				HMODULE hm = NULL;
+
+				if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+					GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+					lpProcName, &hm) == 0)
+				{
+					int ret = GetLastError();
+					fprintf(stderr, "GetModuleHandle failed, error = %d\n", ret);
+					// Return or however you want to handle an error.
+				}
+				if (GetModuleFileName(hm, path, sizeof(path)) == 0)
+				{
+					int ret = GetLastError();
+					fprintf(stderr, "GetModuleFileName failed, error = %d\n", ret);
+					// Return or however you want to handle an error.
+				}
+
+				// The path variable should now contain the full filepath for this DLL.
+
+				outfile.open(nucleusFolder + logFile, std::ios_base::app);
+				outfile << date_string() << "SHOOK: path " << path << "\n";
+				outfile.close();
+
+				return NULL;
+			}
+
+		}
+	}
+
+	return GetProcAddress(hModule, lpProcName);
+}
+
+bool hasEnding(std::string const& fullString, std::string const& ending)
+{
+	if (fullString.length() >= ending.length()) {
+		return (0 == fullString.compare(fullString.length() - ending.length(), ending.length(), ending));
+	}
+	else {
+		return false;
+	}
+}
+
+bool replace(std::string& str, const std::string& from, const std::string& to) {
+	size_t start_pos = str.find(from);
+	if (start_pos == std::string::npos)
+		return false;
+	str.replace(start_pos, from.length(), to);
 	return true;
 }
 
@@ -541,6 +648,74 @@ BOOL WINAPI EnumWindows_Hook(WNDENUMPROC lpEnumFunc, LPARAM lParam)
 	return TRUE;
 }
 
+BOOL ReadFile_Hook(
+	HANDLE       hFile,
+	LPVOID       lpBuffer,
+	DWORD        nNumberOfBytesToRead,
+	LPDWORD      lpNumberOfBytesRead,
+	LPOVERLAPPED lpOverlapped
+)
+{
+	return ReadFile(
+		hFile,
+		lpBuffer,
+		nNumberOfBytesToRead,
+		lpNumberOfBytesRead,
+		lpOverlapped
+	);
+}
+
+BOOL ReadFileEx_Hook(
+	HANDLE                          hFile,
+	LPVOID                          lpBuffer,
+	DWORD                           nNumberOfBytesToRead,
+	LPOVERLAPPED                    lpOverlapped,
+	LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+)
+{
+	return ReadFileEx(
+		hFile,
+		lpBuffer,
+		nNumberOfBytesToRead,
+		lpOverlapped,
+		lpCompletionRoutine
+	);
+}
+
+BOOL WriteFile_Hook(
+	HANDLE       hFile,
+	LPCVOID      lpBuffer,
+	DWORD        nNumberOfBytesToWrite,
+	LPDWORD      lpNumberOfBytesWritten,
+	LPOVERLAPPED lpOverlapped
+)
+{
+	return WriteFile(
+		hFile,
+		lpBuffer,
+		nNumberOfBytesToWrite,
+		lpNumberOfBytesWritten,
+		lpOverlapped
+	);
+}
+
+BOOL WriteFileEx_Hook(
+	HANDLE                          hFile,
+	LPCVOID                         lpBuffer,
+	DWORD                           nNumberOfBytesToWrite,
+	LPOVERLAPPED                    lpOverlapped,
+	LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+)
+{
+	return WriteFileEx(
+		hFile,
+		lpBuffer,
+		nNumberOfBytesToWrite,
+		lpOverlapped,
+		lpCompletionRoutine
+	);
+}
+
 HANDLE CreateFileW_Hook(
 	LPCWSTR               lpFileName,
 	DWORD                 dwDesiredAccess,
@@ -557,18 +732,9 @@ HANDLE CreateFileW_Hook(
 	wstring rawHidWstring(rawHid);
 	string rawHidStr(rawHidWstring.begin(), rawHidWstring.end());
 
-	if(fileNameStr.find("HID") != std::string::npos)
+	if (fileNameStr.find("HID") != std::string::npos)
 	{
-		//if (IsDebug)
-		//{
-		//	bool result = caseInSensStringCompare(fileNameStr, rawHidStr);
-		//	outfile.open(nucleusFolder + logFile, std::ios_base::app);
-		//	outfile << date_string() << "SHOOK: CREATEFILE - " << fileNameStr << " " << rawHidStr << " compare: " << result << "\n";
-		//	outfile.close();
-		//}
-		
-		//if (fileNameStr.find("#8&37c6b2bf&0&0000#") != std::string::npos)
-		if(!caseInSensStringCompare(fileNameStr, rawHidStr))
+		if (!caseInSensStringCompare(fileNameStr, rawHidStr))
 		{
 			if (IsDebug)
 			{
@@ -579,8 +745,86 @@ HANDLE CreateFileW_Hook(
 			return INVALID_HANDLE_VALUE;
 		}
 	}
+	//else if (fileNameStr.find("LocalLow") != std::string::npos)
+	//{
+	//	if (replace(fileNameStr, "LocalLow", "NucleusCoop\\" + playerNick + "\\LocalLow"))
+	//	{
+	//		if (IsDebug)
+	//		{
+	//			outfile.open(nucleusFolder + logFile, std::ios_base::app);
+	//			outfile << date_string() << "SHOOK: CREATEFILE - BEFORE " << fileNameStr << "\n";
+	//			outfile.close();
+	//		}
+	//		lpFileName = s2ws(fileNameStr).c_str();
+	//		if (IsDebug)
+	//		{
+	//			outfile.open(nucleusFolder + logFile, std::ios_base::app);
+	//			outfile << date_string() << "SHOOK: CREATEFILE - REPLACING " << fileNameStr << "\n";
+	//			outfile.close();
+	//		}
+	//	}
+	//}
 
 	return CreateFileW(
+		lpFileName,
+		dwDesiredAccess,
+		dwShareMode,
+		lpSecurityAttributes,
+		dwCreationDisposition,
+		dwFlagsAndAttributes,
+		hTemplateFile
+	);
+}
+
+HANDLE CreateFileA_Hook(
+	LPCSTR				  lpFileName,
+	DWORD                 dwDesiredAccess,
+	DWORD                 dwShareMode,
+	LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+	DWORD                 dwCreationDisposition,
+	DWORD                 dwFlagsAndAttributes,
+	HANDLE                hTemplateFile
+)
+{
+	string fileNameStr(lpFileName);
+
+	wstring rawHidWstring(rawHid);
+	string rawHidStr(rawHidWstring.begin(), rawHidWstring.end());
+
+	if (fileNameStr.find("HID") != std::string::npos)
+	{
+		if (!caseInSensStringCompare(fileNameStr, rawHidStr))
+		{
+			if (IsDebug)
+			{
+				outfile.open(nucleusFolder + logFile, std::ios_base::app);
+				outfile << date_string() << "SHOOK: CREATEFILE - BLOCKING " << fileNameStr << "\n";
+				outfile.close();
+			}
+			return INVALID_HANDLE_VALUE;
+		}
+	}
+	//else if (fileNameStr.find("LocalLow") != std::string::npos)
+	//{
+	//	if (replace(fileNameStr, "LocalLow", "NucleusCoop\\" + playerNick + "\\LocalLow"))
+	//	{
+	//		if (IsDebug)
+	//		{
+	//			outfile.open(nucleusFolder + logFile, std::ios_base::app);
+	//			outfile << date_string() << "SHOOK: CREATEFILE - BEFORE " << fileNameStr << "\n";
+	//			outfile.close();
+	//		}
+	//		lpFileName = fileNameStr.c_str();
+	//		if (IsDebug)
+	//		{
+	//			outfile.open(nucleusFolder + logFile, std::ios_base::app);
+	//			outfile << date_string() << "SHOOK: CREATEFILE - REPLACING " << fileNameStr << "\n";
+	//			outfile.close();
+	//		}
+	//	}
+	//}
+
+	return CreateFileA(
 		lpFileName,
 		dwDesiredAccess,
 		dwShareMode,
@@ -622,7 +866,7 @@ BOOL CALLBACK EnumProc(HWND hWnd, LPARAM lParam) {
 // Main entry
 HWND FindWindowFromProcessId(DWORD dwProcessId) {
 	EnumData ed = { dwProcessId };
-	if (!EnumWindows(EnumProc, (LPARAM)& ed) &&
+	if (!EnumWindows(EnumProc, (LPARAM)&ed) &&
 		(GetLastError() == ERROR_SUCCESS)) {
 		return ed.hWnd;
 	}
@@ -673,6 +917,84 @@ NTSTATUS installHook(LPCSTR moduleHandle, LPCSTR proc, void* callBack)
 	return result;
 }
 
+
+HMODULE WINAPI LoadLibraryA_Hook(LPCSTR lpLibFileName)
+{
+	HMODULE result = LoadLibraryA(lpLibFileName);
+
+	string str(lpLibFileName);
+
+	if (IsDebug)
+	{
+		outfile.open(nucleusFolder + logFile, std::ios_base::app);
+		outfile << date_string() << "SHOOK: LOADLIBRARYA " << lpLibFileName << " str " << str << "\n";
+		outfile.close();
+	}
+
+	if (hasEnding(str, "xinput9_1_0.dll"))
+	{
+		if (IsDebug)
+		{
+			outfile.open(nucleusFolder + logFile, std::ios_base::app);
+			outfile << date_string() << "SHOOK: LOADLIBRARYA HOOK\n";
+			outfile.close();
+		}
+		return NULL;
+	}
+
+	return result;
+}
+
+HMODULE WINAPI LoadLibraryExA_Hook(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+{
+	HMODULE result = LoadLibraryExA(lpLibFileName, hFile, dwFlags);
+
+	string str(lpLibFileName);
+
+	if (IsDebug)
+	{
+		outfile.open(nucleusFolder + logFile, std::ios_base::app);
+		outfile << date_string() << "SHOOK: LOADLIBRARYEXA " << lpLibFileName << " str " << str << "\n";
+		outfile.close();
+	}
+
+	return result;
+}
+
+HMODULE WINAPI LoadLibraryW_Hook(LPCWSTR lpLibFileName)
+{
+	HMODULE result = LoadLibraryW(lpLibFileName);
+
+	wstring fileNameWstring(lpLibFileName);
+	string str(fileNameWstring.begin(), fileNameWstring.end());
+
+	if (IsDebug)
+	{
+		outfile.open(nucleusFolder + logFile, std::ios_base::app);
+		outfile << date_string() << "SHOOK: LOADLIBRARYW " << lpLibFileName << " str " << str << "\n";
+		outfile.close();
+	}
+
+	return result;
+}
+
+HMODULE WINAPI LoadLibraryExW_Hook(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+{
+	HMODULE result = LoadLibraryExW(lpLibFileName, hFile, dwFlags);
+
+	wstring fileNameWstring(lpLibFileName);
+	string str(fileNameWstring.begin(), fileNameWstring.end());
+
+	if (IsDebug)
+	{
+		outfile.open(nucleusFolder + logFile, std::ios_base::app);
+		outfile << date_string() << "SHOOK: LOADLIBRARYEXW " << lpLibFileName << " str " << str << "\n";
+		outfile.close();
+	}
+
+	return result;
+}
+
 void installFindMutexHooks(LPCWSTR targets)
 {
 	//Random
@@ -692,6 +1014,15 @@ void installFindMutexHooks(LPCWSTR targets)
 		while ((endIndex = target_s.find(splitter, startIndex)) < target_s.size())
 		{
 			std::wstring sub = target_s.substr(startIndex, endIndex - startIndex);
+
+			size_t found = sub.find('|');
+
+			if (found != std::string::npos) {
+				startIndex += found + 1;
+			}
+
+			sub = target_s.substr(startIndex, endIndex - startIndex);
+
 			if (IsDebug)
 			{
 				outfile.open(nucleusFolder + logFile, std::ios_base::app);
@@ -706,6 +1037,14 @@ void installFindMutexHooks(LPCWSTR targets)
 		{
 			//No splitters in string
 			std::wstring sub = target_s.substr(startIndex);
+
+			size_t found = sub.find('|');
+			if (found != std::string::npos) {
+				startIndex += found + 1;
+			}
+
+			sub = target_s.substr(startIndex, endIndex - startIndex);
+
 			if (IsDebug)
 			{
 				outfile.open(nucleusFolder + logFile, std::ios_base::app);
@@ -721,7 +1060,7 @@ void installFindMutexHooks(LPCWSTR targets)
 
 	//Ntdll functions
 #define GET_NT_PROC(name, type) (type)GetProcAddress(GetModuleHandle("ntdll.dll"), name)
-	
+
 	NtCreateMutant = GET_NT_PROC("NtCreateMutant", t_NtCreateMutant);
 	NtCreateMutant = GET_NT_PROC("NtCreateMutant", t_NtCreateMutant);
 	NtOpenMutant = GET_NT_PROC("NtOpenMutant", t_NtOpenMutant);
@@ -755,7 +1094,7 @@ void installFindMutexHooks(LPCWSTR targets)
 
 // EasyHook will be looking for this export to support DLL injection. If not found then 
 // DLL injection will fail.
-extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE_ENTRY_INFO* inRemoteInfo);
+extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE_ENTRY_INFO * inRemoteInfo);
 
 void __stdcall NativeInjectionEntryPoint(REMOTE_ENTRY_INFO* inRemoteInfo)
 {
@@ -770,27 +1109,41 @@ void __stdcall NativeInjectionEntryPoint(REMOTE_ENTRY_INFO* inRemoteInfo)
 	const bool BlockRaw = data[4] == 1;
 	const bool CreateSingle = data[5] == 1;
 
+	width = (data[18] << 24) + (data[19] << 16) + (data[20] << 8) + data[21];
+	height = (data[22] << 24) + (data[23] << 16) + (data[24] << 8) + data[25];
+	posx = (data[26] << 24) + (data[27] << 16) + (data[28] << 8) + data[29];
+	posy = (data[30] << 24) + (data[31] << 16) + (data[32] << 8) + data[33];
+
 	const size_t pathLength = (data[10] << 24) + (data[11] << 16) + (data[12] << 8) + data[13];
 	auto nucleusFolderPath = static_cast<PWSTR>(malloc(pathLength + sizeof(WCHAR)));
-	memcpy(nucleusFolderPath, &data[18], pathLength);
+	memcpy(nucleusFolderPath, &data[38], pathLength);
 	nucleusFolderPath[pathLength / sizeof(WCHAR)] = '\0';
 
 	nucleusFolder = nucleusFolderPath;
 
 	const size_t targetsLength = (data[14] << 24) + (data[15] << 16) + (data[16] << 8) + data[17];
 	auto targets = static_cast<PWSTR>(malloc(targetsLength + sizeof(WCHAR)));
-	memcpy(targets, &data[19 + pathLength], targetsLength);
+	memcpy(targets, &data[39 + pathLength], targetsLength);
 	targets[targetsLength / sizeof(WCHAR)] = '\0';
 
 	const size_t hidLength = (data[6] << 24) + (data[7] << 16) + (data[8] << 8) + data[9];
 	auto rhid = static_cast<PWSTR>(malloc(hidLength + sizeof(WCHAR)));
-	memcpy(rhid, &data[20 + pathLength + targetsLength], hidLength);
+	memcpy(rhid, &data[40 + pathLength + targetsLength], hidLength);
 	rhid[hidLength / sizeof(WCHAR)] = '\0';
 
 	wstring rawHidWstring(rhid);
 	string rawHidStr(rawHidWstring.begin(), rawHidWstring.end());
 
 	rawHid = s2ws(rawHidStr);
+
+	const size_t nickLength = (data[34] << 24) + (data[35] << 16) + (data[36] << 8) + data[37];
+	auto nick = static_cast<PWSTR>(malloc(nickLength + sizeof(WCHAR)));
+	memcpy(nick, &data[41 + pathLength + targetsLength + hidLength], nickLength);
+	nick[nickLength / sizeof(WCHAR)] = '\0';
+
+	wstring nickWstring(nick);
+	string pnick(nickWstring.begin(), nickWstring.end());
+	playerNick = pnick;
 
 	//const size_t hidLength = (data[18] << 24) + (data[19] << 16) + (data[20] << 8) + data[21];
 	//auto hidName = static_cast<PWSTR>(malloc(hidLength + sizeof(WCHAR)));
@@ -802,11 +1155,21 @@ void __stdcall NativeInjectionEntryPoint(REMOTE_ENTRY_INFO* inRemoteInfo)
 	if (IsDebug)
 	{
 		outfile.open(nucleusFolder + logFile, std::ios_base::app);
-		outfile << date_string() << "SHOOK: Starting hook injection, HookWindow: " << HookWindow << " RenameMutex: " << RenameMutex << " SetWindow: " << SetWindow << " BlockRaw: " << BlockRaw << " CreateSingle: " << CreateSingle << " RawHID: " << rawHidStr << "\n";
+		outfile << date_string() << "SHOOK: Starting hook injection, HookWindow: " << HookWindow << " RenameMutex: " << RenameMutex << " SetWindow: " << SetWindow << " BlockRaw: " << BlockRaw << " CreateSingle: " << CreateSingle << " RawHID: " << rawHidStr << " Width: " << width << " Height: " << height << " POSX: " << posx << " POSY: " << posy << " NICK: " << playerNick << "\n";
 		outfile.close();
 	}
 
-	
+	//installHook("kernel32", "LoadLibraryA", LoadLibraryA_Hook);
+	//installHook("kernel32", "LoadLibraryExA", LoadLibraryExA_Hook);
+	//installHook("kernel32", "LoadLibraryW", LoadLibraryW_Hook);
+	//installHook("kernel32", "LoadLibraryExW", LoadLibraryExW_Hook);
+	//installHook("user32", "RegisterUserApiHook", RegisterUserApiHook_Hook);
+	//installHook("kernel32", "GetProcAddress", GetProcAddress_Hook);
+	//installHook("kernel32", "ReadFile", ReadFile_Hook);
+	//installHook("kernel32", "ReadFileEx", ReadFileEx_Hook);
+	//installHook("kernel32", "WriteFile", WriteFile_Hook);
+	//installHook("kernel32", "WriteFileEx", WriteFileEx_Hook);
+
 	if (SetWindow)
 	{
 		if (IsDebug)
@@ -900,6 +1263,7 @@ void __stdcall NativeInjectionEntryPoint(REMOTE_ENTRY_INFO* inRemoteInfo)
 		}
 
 		installHook("kernel32", "CreateFileW", CreateFileW_Hook);
+		installHook("kernel32", "CreateFileA", CreateFileA_Hook);
 
 		if (!RenameMutex)
 		{

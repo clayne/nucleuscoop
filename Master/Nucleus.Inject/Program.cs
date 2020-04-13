@@ -123,6 +123,10 @@ namespace Nucleus.Inject
 			string playerNick = args[i++];
 			bool.TryParse(args[i++], out bool createSingle);
 			string rawHid = args[i++];
+			int.TryParse(args[i++], out int width);
+			int.TryParse(args[i++], out int height);
+			int.TryParse(args[i++], out int posx);
+			int.TryParse(args[i++], out int posy);
 
 			//IntPtr InPassThruBuffer = Marshal.StringToHGlobalUni(args[i++]);
 			//uint.TryParse(args[i++], out uint InPassThruSize);
@@ -179,7 +183,10 @@ namespace Nucleus.Inject
 			var rawHidBytes = Encoding.Unicode.GetBytes(rawHid);
 			int rawHidBytesLength = rawHidBytes.Length;
 
-			int size = 28 + logPathLength + targetsBytesLength + rawHidBytesLength;
+			var playerNickBytes = Encoding.Unicode.GetBytes(playerNick);
+			int playerNickLength = playerNickBytes.Length;
+
+			int size = 48 + logPathLength + targetsBytesLength + rawHidBytesLength + playerNickLength;
 			var data = new byte[size];
 			data[0] = hookWindow == true ? (byte) 1 : (byte) 0;
 			data[1] = renameMutex == true ? (byte) 1 : (byte) 0;
@@ -203,11 +210,38 @@ namespace Nucleus.Inject
 			data[16] = (byte) (targetsBytesLength >> 8);
 			data[17] = (byte) targetsBytesLength;
 
-			Array.Copy(logPath, 0, data, 18, logPathLength);
+			data[18] = (byte)(width >> 24);
+			data[19] = (byte)(width >> 16);
+			data[20] = (byte)(width >> 8);
+			data[21] = (byte)width;
 
-			Array.Copy(targetsBytes, 0, data, 19 + logPathLength, targetsBytesLength);
+			data[22] = (byte)(height >> 24);
+			data[23] = (byte)(height >> 16);
+			data[24] = (byte)(height >> 8);
+			data[25] = (byte)height;
 
-			Array.Copy(rawHidBytes, 0, data, 20 + logPathLength + targetsBytesLength, rawHidBytesLength);
+			data[26] = (byte)(posx >> 24);
+			data[27] = (byte)(posx >> 16);
+			data[28] = (byte)(posx >> 8);
+			data[29] = (byte)posx;
+
+			data[30] = (byte)(posy >> 24);
+			data[31] = (byte)(posy >> 16);
+			data[32] = (byte)(posy >> 8);
+			data[33] = (byte)posy;
+
+			data[34] = (byte)(playerNickLength >> 24);
+			data[35] = (byte)(playerNickLength >> 16);
+			data[36] = (byte)(playerNickLength >> 8);
+			data[37] = (byte)playerNickLength;
+
+			Array.Copy(logPath, 0, data, 38, logPathLength);
+
+			Array.Copy(targetsBytes, 0, data, 39 + logPathLength, targetsBytesLength);
+
+			Array.Copy(rawHidBytes, 0, data, 40 + logPathLength + targetsBytesLength, rawHidBytesLength);
+
+			Array.Copy(playerNickBytes, 0, data, 41 + logPathLength + targetsBytesLength + rawHidBytesLength, playerNickLength);
 
 			IntPtr ptr = Marshal.AllocHGlobal(size);
 			Marshal.Copy(data, 0, ptr, size);
@@ -312,6 +346,11 @@ namespace Nucleus.Inject
 			bool.TryParse(args[i++], out bool setWindow);
 			bool.TryParse(args[i++], out bool preventWindowDeactivation);
 
+			int.TryParse(args[i++], out int width);
+			int.TryParse(args[i++], out int height);
+			int.TryParse(args[i++], out int posx);
+			int.TryParse(args[i++], out int posy);
+
 			bool.TryParse(args[i++], out bool setCursorPos);
 			bool.TryParse(args[i++], out bool getCursorPos);
 			bool.TryParse(args[i++], out bool getKeyState);
@@ -342,7 +381,7 @@ namespace Nucleus.Inject
 			var readPipeNameBytes = Encoding.Unicode.GetBytes(readPipeName);
 			int readPipeNameLength = readPipeNameBytes.Length;
 
-			int size = 42 + logPathLength + writePipeNameLength + readPipeNameLength;
+			int size = 58 + logPathLength + writePipeNameLength + readPipeNameLength;
 			IntPtr intPtr = Marshal.AllocHGlobal(size);
 			byte[] dataToSend = new byte[size];
 
@@ -397,6 +436,26 @@ namespace Nucleus.Inject
 			dataToSend[index++] = (byte) (readPipeNameLength >> 16);
 			dataToSend[index++] = (byte) (readPipeNameLength >> 8);
 			dataToSend[index++] = (byte) readPipeNameLength;
+
+			dataToSend[index++] = (byte)(width >> 24);
+			dataToSend[index++] = (byte)(width >> 16);
+			dataToSend[index++] = (byte)(width >> 8);
+			dataToSend[index++] = (byte)width;
+
+			dataToSend[index++] = (byte)(height >> 24);
+			dataToSend[index++] = (byte)(height >> 16);
+			dataToSend[index++] = (byte)(height >> 8);
+			dataToSend[index++] = (byte)height;
+
+			dataToSend[index++] = (byte)(posx >> 24);
+			dataToSend[index++] = (byte)(posx >> 16);
+			dataToSend[index++] = (byte)(posx >> 8);
+			dataToSend[index++] = (byte)posx;
+
+			dataToSend[index++] = (byte)(posy >> 24);
+			dataToSend[index++] = (byte)(posy >> 16);
+			dataToSend[index++] = (byte)(posy >> 8);
+			dataToSend[index++] = (byte)posy;
 
 			Array.Copy(logPath, 0, dataToSend, index, logPathLength);
 			Array.Copy(writePipeNameBytes, 0, dataToSend, index + logPathLength, writePipeNameLength);

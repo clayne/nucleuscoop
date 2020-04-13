@@ -53,17 +53,28 @@ namespace Nucleus.Coop.Forms
             
             txt_AuthDesc.Text = Handler.Description;
 
+            Bitmap bmp = new Bitmap(Properties.Resources.no_image);
             string _cover = $@"https://images.igdb.com/igdb/image/upload/t_cover_small/{Handler.GameCover}.jpg";
+
             ServicePointManager.Expect100Continue = true;
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls
+                    | SecurityProtocolType.Tls11
+                    | SecurityProtocolType.Tls12
+                    | SecurityProtocolType.Ssl3;
+            ServicePointManager.ServerCertificateValidationCallback = (snder, cert, chain, error) => true;
 
-            WebRequest request = WebRequest.Create(_cover);
-            WebResponse resp = request.GetResponse();
-            Stream respStream = resp.GetResponseStream();
-            Bitmap bmp = new Bitmap(respStream);
-            respStream.Dispose();
-
+            try
+            {
+                WebRequest request = WebRequest.Create(_cover);
+                WebResponse resp = request.GetResponse();
+                Stream respStream = resp.GetResponseStream();
+                bmp = new Bitmap(respStream);
+                respStream.Dispose();
+            }
+            catch (Exception) { }
+                
             pic_GameCover.Image = bmp;
+            
 
             string rawComments = Get(api + "comments/" + Handler.Id);
             if (rawComments != "{}")
@@ -109,7 +120,7 @@ namespace Nucleus.Coop.Forms
 
         private void btn_Download_Click(object sender, EventArgs e)
         {
-            DownloadPrompt downloadPrompt = new DownloadPrompt(Handler, mainForm);
+            DownloadPrompt downloadPrompt = new DownloadPrompt(Handler, mainForm, null);
             downloadPrompt.ShowDialog();
         }
 

@@ -105,6 +105,24 @@ namespace Nucleus.Gaming.Coop.InputManagement
 						window.End();
 					}
 				}
+				else if (msg.message == 0x0400 + 1)
+				{
+					//Create cursors
+					Logger.WriteLine($"RawInputWindow received create cursors message");
+
+					bool internalInputUpdate = msg.wParam == (IntPtr) 1;
+					bool drawCursorForControllers = msg.lParam == (IntPtr) 1;
+
+					foreach (var window in RawInputManager.windows)
+					{
+						//Cursor needs to be created on the MainForm message loop so it can be accessed in the loop.
+						bool kbm = window.KeyboardAttached != (IntPtr) (-1) || window.MouseAttached != (IntPtr) (-1);
+						if (kbm || drawCursorForControllers)
+						{
+							window.CreateCursor(!kbm && internalInputUpdate);
+						}
+					}
+				}
 				else
 				{
 					sqErr = 0;

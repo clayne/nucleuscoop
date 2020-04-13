@@ -80,15 +80,20 @@
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="DotNetZip, Version=1.13.5.0, Culture=neutral, PublicKeyToken=6583c7c814667745, processorArchitecture=MSIL">
-      <HintPath>..\packages\DotNetZip.1.13.5\lib\net40\DotNetZip.dll</HintPath>
+    <Reference Include="DotNetZip, Version=1.13.7.0, Culture=neutral, PublicKeyToken=6583c7c814667745, processorArchitecture=MSIL">
+      <HintPath>..\packages\DotNetZip.1.13.7\lib\net40\DotNetZip.dll</HintPath>
     </Reference>
-    <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.10.0.3\lib\net40\Newtonsoft.Json.dll</HintPath>
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.12.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="SlimDX, Version=4.0.13.43, Culture=neutral, PublicKeyToken=b1b0c32fd1ffe4f9, processorArchitecture=x86">
-      <HintPath>..\packages\SlimDX.4.0.13.44\lib\NET40\SlimDX.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="SharpDX, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>..\packages\SharpDX.4.2.0\lib\net45\SharpDX.dll</HintPath>
+    </Reference>
+    <Reference Include="SharpDX.DirectInput, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>..\packages\SharpDX.DirectInput.4.2.0\lib\net45\SharpDX.DirectInput.dll</HintPath>
+    </Reference>
+    <Reference Include="SharpDX.XInput, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>..\packages\SharpDX.XInput.4.2.0\lib\net45\SharpDX.XInput.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -127,6 +132,8 @@
     <Compile Include="Forms\HandlerInfo.Designer.cs">
       <DependentUpon>HandlerInfo.cs</DependentUpon>
     </Compile>
+    <Compile Include="Forms\ListViewColumnSorter.cs" />
+    <Compile Include="Forms\ListViewExtensions.cs" />
     <Compile Include="Forms\MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -191,6 +198,7 @@
       <SubType>Designer</SubType>
     </None>
     <None Include="copyoutput\Settings.ini" />
+    <None Include="copyoutput\utils\devreorder\devreorder.ini" />
     <None Include="copyoutput\utils\FlawlessWidescreen\x64\data\about_track.xm" />
     <None Include="copyoutput\utils\FlawlessWidescreen\x64\PluginCache\FWS_Plugins\GlobalDependencies\Scripts\StandardBase.lua" />
     <None Include="copyoutput\utils\FlawlessWidescreen\x64\PluginCache\FWS_Plugins\GlobalDependencies\Scripts\StandardTheme.lua" />
@@ -213,18 +221,6 @@
     <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\mods.EXAMPLE\12345\mod_file1" />
     <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\mods.EXAMPLE\12345\mod_file2" />
     <None Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\mods.EXAMPLE\12345\random_mod_file" />
-    <None Include="packages.config" />
-    <None Include="Properties\Settings.settings">
-      <Generator>SettingsSingleFileGenerator</Generator>
-      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
-    </None>
-    <Compile Include="Properties\Settings.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Settings.settings</DependentUpon>
-      <DesignTimeSharedInput>True</DesignTimeSharedInput>
-    </Compile>
-    <None Include="SplitKey.snk" />
-    <None Include="copyoutput\utils\devreorder\devreorder.ini" />
     <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu.ini" />
     <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Common\218620\inventory.bin" />
     <None Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu\Common\218620\item_schema.bin" />
@@ -241,6 +237,17 @@
     <None Include="copyoutput\utils\XInputPlus\x86\xinput1_3.dl_" />
     <None Include="copyoutput\utils\XInputPlus\XInputPlus.ini" />
     <None Include="copyoutput\utils\XInputPlus\XInputPlus_Default.ini" />
+    <None Include="packages.config" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <None Include="SplitKey.snk" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -343,6 +350,8 @@
     <Content Include="copyoutput\utils\devreorder\x86\dinput8.dll" />
     <Content Include="copyoutput\utils\DirectXWrapper\d3d9.dll" />
     <Content Include="copyoutput\utils\Do NOT change file or folder names.txt" />
+    <Content Include="copyoutput\utils\EAC Bypass\EasyAntiCheat_x64.dll" />
+    <Content Include="copyoutput\utils\EAC Bypass\EasyAntiCheat_x86.dll" />
     <Content Include="copyoutput\utils\FlawlessWidescreen\x64\bass.dll" />
     <Content Include="copyoutput\utils\FlawlessWidescreen\x64\BeaEngine.dll" />
     <Content Include="copyoutput\utils\FlawlessWidescreen\x64\data\about_1.png" />
@@ -475,6 +484,9 @@
     <Content Include="copyoutput\utils\GoldbergEmu\steam_settings.EXAMPLE\stats.EXAMPLE.txt" />
     <Content Include="copyoutput\utils\GoldbergEmu\tools\generate_interfaces_file.exe" />
     <Content Include="copyoutput\utils\GoldbergEmu\tools\Readme_generate_interfaces.txt" />
+    <None Include="Resources\no_image.jpg" />
+    <None Include="Resources\setting.png" />
+    <Content Include="copyoutput\utils\LaunchUsers\PsExec.exe" />
     <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu.dll" />
     <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu.txt" />
     <Content Include="copyoutput\utils\SmartSteamEmu\SmartSteamEmu64.dll" />
@@ -506,11 +518,11 @@
     <Content Include="copyoutput\utils\XInputPlus\XInputPlus.exe" />
     <Content Include="copyoutput\utils\XInputPlus\ìXÉVùÜù=.txt" />
     <Content Include="copyoutput\utils\XInputPlus\òKé+é¿ô¦é¦é¡é+é¦éó.txt" />
-    <None Include="Resources\setting.png" />
     <Content Include="icon.ico" />
     <Content Include="Resources\icon.ico" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="copyoutput\utils\backup\" />
     <Folder Include="copyoutput\utils\FlawlessWidescreen\x64\PluginCache\FWS_Plugins\Modules\" />
     <Folder Include="copyoutput\utils\User\" />
   </ItemGroup>
