@@ -16,6 +16,8 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Microsoft.Win32;
 using System.Text;
+using System.Runtime.ExceptionServices;
+using System.Reflection;
 
 namespace Nucleus.Coop
 {
@@ -24,7 +26,7 @@ namespace Nucleus.Coop
     /// </summary>
     public partial class MainForm : BaseForm
     {
-        public string version = "v0.9.9.9 r4";
+        public string version = "v1.0 R5 (Final)";
 
         private Settings settingsForm = null;
 
@@ -62,7 +64,10 @@ namespace Nucleus.Coop
 
         private bool TopMostToggle = true;
 
-		public Action<IntPtr> RawInputAction { get; set; }
+        private string NucleusEnvironmentRoot = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        private string DocumentsRoot = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        public Action<IntPtr> RawInputAction { get; set; }
 
         public enum MachineType : ushort
         {
@@ -631,7 +636,11 @@ namespace Nucleus.Coop
             if (handler != null)
             {
                 Log("OnFormClosed method calling Handler End function");
-                handler.End(false);
+                try
+                {
+                    handler.End(false);
+                }
+                catch { }
             }
             User32Util.ShowTaskBar();
         }
@@ -724,13 +733,17 @@ namespace Nucleus.Coop
 
         private void handler_Ended()
         {
+            Log("Handler ended method called");
             User32Util.ShowTaskBar();
             handler = null;
-            if (handlerThread != null)
+            try
             {
-                handlerThread.Abort();
-                handlerThread = null;
-            }
+                if (handlerThread != null)
+                {
+                    handlerThread.Abort();
+                    handlerThread = null;
+                }
+            } catch { }
             Invoke(new Action(SetBtnToPlay));
         }
 
@@ -748,19 +761,50 @@ namespace Nucleus.Coop
                     string error = gameManager.Error;
                     if (!string.IsNullOrEmpty(error))
                     {
-                        MessageBox.Show(error, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        //MessageBox.Show(error, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                        LogManager.Log("Restoring backed up registry files - method 3");
+                        string[] regFiles = Directory.GetFiles(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "utils\\backup"), "*.reg", SearchOption.AllDirectories);
+                        foreach (string regFilePath in regFiles)
+                        {
+                            System.Diagnostics.Process proc = new System.Diagnostics.Process();
+
+                            try
+                            {
+                                proc.StartInfo.FileName = "reg.exe";
+                                proc.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+                                proc.StartInfo.CreateNoWindow = true;
+                                proc.StartInfo.UseShellExecute = false;
+
+                                string command = "import \"" + regFilePath + "\"";
+                                proc.StartInfo.Arguments = command;
+                                proc.Start();
+
+                                proc.WaitForExit();
+                                LogManager.Log($"Imported {Path.GetFileName(regFilePath)}");
+                            }
+                            catch (Exception)
+                            {
+                                proc.Dispose();
+                            }
+
+                            File.Delete(regFilePath);
+                        }
+
                         handler_Ended();
                         return;
                     }
+
+                    //User32Util.ShowTaskBar();
 
                     handler.Update(handler.TimerInterval);
                     Thread.Sleep(TimeSpan.FromMilliseconds(handler.TimerInterval));
                 }
                 catch (ThreadAbortException)
                 {
-                    return;
+                    //return;
                 }
-                catch { }
+                //catch { }
             }
         }
 
@@ -1017,6 +1061,10 @@ namespace Nucleus.Coop
                 gameContextMenuStrip.Items[9].Visible = false;
                 gameContextMenuStrip.Items[10].Visible = false;
                 gameContextMenuStrip.Items[11].Visible = false;
+                gameContextMenuStrip.Items[12].Visible = false;
+                gameContextMenuStrip.Items[13].Visible = false;
+                gameContextMenuStrip.Items[14].Visible = false;
+                gameContextMenuStrip.Items[15].Visible = false;
 
                 if (string.IsNullOrEmpty(currentGameInfo.GameGuid) || currentGameInfo == null)
                 {
@@ -1030,8 +1078,30 @@ namespace Nucleus.Coop
                 {
                     gameContextMenuStrip.Items[0].Text = currentGameInfo.Game.GameName;
 
-                    bool configPathExists = false;
-                    bool savePathExists = false;
+                    bool userConfigPathExists = false;
+                    bool userSavePathExists = false;
+                    bool docConfigPathExists = false;
+                    bool docSavePathExists = false;
+
+                    //bool userConfigPathConverted = false;
+                    if (currentGameInfo.Game.UserProfileConfigPath?.Length > 0 && currentGameInfo.Game.UserProfileConfigPath.ToLower().StartsWith(@"documents\"))
+                    {
+                        currentGameInfo.Game.DocumentsConfigPath = currentGameInfo.Game.UserProfileConfigPath.Substring(10);
+                        currentGameInfo.Game.UserProfileConfigPath = null;
+                        currentGameInfo.Game.DocumentsConfigPathNoCopy = currentGameInfo.Game.UserProfileConfigPathNoCopy;
+                        currentGameInfo.Game.ForceDocumentsConfigCopy = currentGameInfo.Game.ForceUserProfileConfigCopy;
+                        //userConfigPathConverted = true;
+                    }
+
+                    //bool userSavePathConverted = false;
+                    if (currentGameInfo.Game.UserProfileSavePath?.Length > 0 && currentGameInfo.Game.UserProfileSavePath.ToLower().StartsWith(@"documents\"))
+                    {
+                        currentGameInfo.Game.DocumentsSavePath = currentGameInfo.Game.UserProfileSavePath.Substring(10);
+                        currentGameInfo.Game.UserProfileSavePath = null;
+                        currentGameInfo.Game.DocumentsSavePathNoCopy = currentGameInfo.Game.UserProfileSavePathNoCopy;
+                        currentGameInfo.Game.ForceDocumentsSaveCopy = currentGameInfo.Game.ForceUserProfileSaveCopy;
+                        //userSavePathConverted = true;
+                    }
 
                     for (int i = 1; i < gameContextMenuStrip.Items.Count; i++)
                     {
@@ -1044,7 +1114,7 @@ namespace Nucleus.Coop
                         gameContextMenuStrip.Items[i].Visible = true;
                         
 
-                        if(string.IsNullOrEmpty(currentGameInfo.Game.UserProfileConfigPath) && string.IsNullOrEmpty(currentGameInfo.Game.UserProfileSavePath))
+                        if(string.IsNullOrEmpty(currentGameInfo.Game.UserProfileConfigPath) && string.IsNullOrEmpty(currentGameInfo.Game.UserProfileSavePath) && string.IsNullOrEmpty(currentGameInfo.Game.DocumentsConfigPath) && string.IsNullOrEmpty(currentGameInfo.Game.DocumentsSavePath))
                         {
                             if(i == 7)
                             {
@@ -1055,9 +1125,11 @@ namespace Nucleus.Coop
                         {
                             profilePaths.Clear();
                             profilePaths.Add(Environment.GetEnvironmentVariable("userprofile"));
+                            profilePaths.Add(DocumentsRoot);
+
                             if (currentGameInfo.Game.UseNucleusEnvironment)
                             {
-                                string targetDirectory = $@"C:\Users\{Environment.UserName}\NucleusCoop\";
+                                string targetDirectory = $@"{NucleusEnvironmentRoot}\NucleusCoop\";
 
                                 if (Directory.Exists(targetDirectory))
                                 {
@@ -1065,9 +1137,29 @@ namespace Nucleus.Coop
                                     foreach (string subdirectory in subdirectoryEntries)
                                     {
                                         profilePaths.Add(subdirectory);
+                                        if ($@"{Path.GetDirectoryName(DocumentsRoot)}\NucleusCoop\" == targetDirectory)
+                                        {
+                                            profilePaths.Add(subdirectory + "\\Documents");
+                                        }
+                                    }
+                                }
+
+                                
+                                if ($@"{Path.GetDirectoryName(DocumentsRoot)}\NucleusCoop\" != targetDirectory)
+                                {
+                                    targetDirectory = $@"{Path.GetDirectoryName(DocumentsRoot)}\NucleusCoop\";
+                                    if (Directory.Exists(targetDirectory))
+                                    {
+                                        string[] subdirectoryEntries = Directory.GetDirectories(targetDirectory, "*", SearchOption.TopDirectoryOnly);
+                                        foreach (string subdirectory in subdirectoryEntries)
+                                        {
+                                            profilePaths.Add(subdirectory + "\\Documents");
+                                        }
                                     }
                                 }
                             }
+
+                            //Path.GetDirectoryName(DocumentsRoot) + $@"\NucleusCoop\{player.Nickname}\Documents"
                         }
 
                         if (i == 9)
@@ -1083,9 +1175,9 @@ namespace Nucleus.Coop
                                         string currPath = Path.Combine(profilePath, currentGameInfo.Game.UserProfileConfigPath);
                                         if (Directory.Exists(currPath))
                                         {
-                                            if (!configPathExists)
+                                            if (!userConfigPathExists)
                                             {
-                                                configPathExists = true;
+                                                userConfigPathExists = true;
                                             }
 
                                             string nucPrefix = "";
@@ -1101,7 +1193,7 @@ namespace Nucleus.Coop
                                 }
                             }
 
-                            if(!configPathExists)
+                            if(!userConfigPathExists)
                             {
                                 gameContextMenuStrip.Items[8].Visible = false;
                                 gameContextMenuStrip.Items[9].Visible = false;
@@ -1121,9 +1213,9 @@ namespace Nucleus.Coop
                                         string currPath = Path.Combine(profilePath, currentGameInfo.Game.UserProfileSavePath);
                                         if (Directory.Exists(currPath))
                                         {
-                                            if (!savePathExists)
+                                            if (!userSavePathExists)
                                             {
-                                                savePathExists = true;
+                                                userSavePathExists = true;
                                             }
 
                                             string nucPrefix = "";
@@ -1139,14 +1231,92 @@ namespace Nucleus.Coop
                                 }
                             }
 
-                            if (!savePathExists)
+                            if (!userSavePathExists)
                             {
                                 gameContextMenuStrip.Items[10].Visible = false;
                                 gameContextMenuStrip.Items[11].Visible = false;
                             }
                         }
 
-                        if(i == 12 && !configPathExists && !savePathExists)
+                        if (i == 13)
+                        {
+                            (gameContextMenuStrip.Items[12] as ToolStripMenuItem).DropDownItems.Clear();
+                            (gameContextMenuStrip.Items[13] as ToolStripMenuItem).DropDownItems.Clear();
+                            if (currentGameInfo.Game.DocumentsConfigPath?.Length > 0)
+                            {
+                                if (profilePaths.Count > 0)
+                                {
+                                    foreach (string profilePath in profilePaths)
+                                    {
+                                        string currPath = Path.Combine(profilePath, currentGameInfo.Game.DocumentsConfigPath);
+                                        if (Directory.Exists(currPath))
+                                        {
+                                            if (!docConfigPathExists)
+                                            {
+                                                docConfigPathExists = true;
+                                            }
+
+                                            string nucPrefix = "";
+                                            if (Directory.GetParent(Directory.GetParent(profilePath).ToString()).Name == "NucleusCoop")
+                                            {
+                                                nucPrefix = "Nucleus: ";
+                                            }
+
+                                            (gameContextMenuStrip.Items[12] as ToolStripMenuItem).DropDownItems.Add(nucPrefix + Directory.GetParent(profilePath).Name, null, new EventHandler(DocOpenSubmenuItem_Click));
+                                            (gameContextMenuStrip.Items[13] as ToolStripMenuItem).DropDownItems.Add(nucPrefix + Directory.GetParent(profilePath).Name, null, new EventHandler(DocDeleteSubmenuItem_Click));
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!docConfigPathExists)
+                            {
+                                gameContextMenuStrip.Items[12].Visible = false;
+                                gameContextMenuStrip.Items[13].Visible = false;
+                            }
+                        }
+
+                        if (i == 15)
+                        {
+                            (gameContextMenuStrip.Items[14] as ToolStripMenuItem).DropDownItems.Clear();
+                            (gameContextMenuStrip.Items[15] as ToolStripMenuItem).DropDownItems.Clear();
+                            if (currentGameInfo.Game.DocumentsSavePath?.Length > 0)
+                            {
+                                if (profilePaths.Count > 0)
+                                {
+                                    foreach (string profilePath in profilePaths)
+                                    {
+                                        string currPath = Path.Combine(profilePath, currentGameInfo.Game.DocumentsSavePath);
+                                        if (Directory.Exists(currPath))
+                                        {
+                                            if (!docSavePathExists)
+                                            {
+                                                docSavePathExists = true;
+                                            }
+
+                                            string nucPrefix = "";
+                                            if (Directory.GetParent(Directory.GetParent(profilePath).ToString()).Name == "NucleusCoop")
+                                            {
+                                                nucPrefix = "Nucleus: ";
+                                            }
+
+                                            (gameContextMenuStrip.Items[14] as ToolStripMenuItem).DropDownItems.Add(nucPrefix + Directory.GetParent(profilePath).Name, null, new EventHandler(DocOpenSubmenuItem_Click));
+                                            (gameContextMenuStrip.Items[15] as ToolStripMenuItem).DropDownItems.Add(nucPrefix + Directory.GetParent(profilePath).Name, null, new EventHandler(DocDeleteSubmenuItem_Click));
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!docSavePathExists)
+                            {
+                                gameContextMenuStrip.Items[14].Visible = false;
+                                gameContextMenuStrip.Items[15].Visible = false;
+                            }
+                        }
+
+
+
+                        if (i == 16 && !userConfigPathExists && !userSavePathExists && !docConfigPathExists && !docSavePathExists)
                         {
                             gameContextMenuStrip.Items[7].Visible = false;
                         }
@@ -1191,7 +1361,7 @@ namespace Nucleus.Coop
             string path;
             if (item.Text.StartsWith("Nucleus: "))
             {
-                path = Path.Combine($@"C:\Users\{Environment.UserName}\NucleusCoop\{item.Text.Substring("Nucleus: ".Length)}\", pathSuffix);
+                path = Path.Combine($@"{NucleusEnvironmentRoot}\NucleusCoop\{item.Text.Substring("Nucleus: ".Length)}\", pathSuffix);
             }
             else
             {
@@ -1222,7 +1392,7 @@ namespace Nucleus.Coop
             string path;
             if (item.Text.StartsWith("Nucleus: "))
             {
-                path = Path.Combine($@"C:\Users\{Environment.UserName}\NucleusCoop\{item.Text.Substring("Nucleus: ".Length)}\", pathSuffix);
+                path = Path.Combine($@"{NucleusEnvironmentRoot}\NucleusCoop\{item.Text.Substring("Nucleus: ".Length)}\", pathSuffix);
             }
             else
             {
@@ -1230,6 +1400,73 @@ namespace Nucleus.Coop
             }
 
             
+            if (Directory.Exists(path))
+            {
+                DialogResult dialogResult = MessageBox.Show("Are you sure you want to delete '" + path + "' and all its contents?", "Confirm deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (dialogResult == DialogResult.Yes)
+                {
+                    Directory.Delete(path, true);
+                }
+            }
+        }
+
+        private void DocOpenSubmenuItem_Click(object sender, EventArgs e)
+        {
+            ToolStripMenuItem item = sender as ToolStripMenuItem;
+            var parent = item.OwnerItem;
+
+            string pathSuffix;
+            if (parent.Text.Contains("Config"))
+            {
+                pathSuffix = currentGameInfo.Game.DocumentsConfigPath;
+            }
+            else
+            {
+                pathSuffix = currentGameInfo.Game.DocumentsSavePath;
+            }
+
+            string path;
+            if (item.Text.StartsWith("Nucleus: "))
+            {
+                path = Path.Combine($@"{Path.GetDirectoryName(DocumentsRoot)}\NucleusCoop\{item.Text.Substring("Nucleus: ".Length)}\Documents", pathSuffix);
+            }
+            else
+            {
+                path = Path.Combine(DocumentsRoot, pathSuffix);
+            }
+
+            if (Directory.Exists(path))
+            {
+                Process.Start(path);
+            }
+        }
+
+        private void DocDeleteSubmenuItem_Click(object sender, EventArgs e)
+        {
+            ToolStripMenuItem item = sender as ToolStripMenuItem;
+            var parent = item.OwnerItem;
+
+            string pathSuffix;
+            if (parent.Text.Contains("Config"))
+            {
+                pathSuffix = currentGameInfo.Game.DocumentsConfigPath;
+            }
+            else
+            {
+                pathSuffix = currentGameInfo.Game.DocumentsSavePath;
+            }
+
+            string path;
+            if (item.Text.StartsWith("Nucleus: "))
+            {
+                path = Path.Combine($@"{Path.GetDirectoryName(DocumentsRoot)}\NucleusCoop\{item.Text.Substring("Nucleus: ".Length)}\Documents", pathSuffix);
+            }
+            else
+            {
+                path = Path.Combine(DocumentsRoot, pathSuffix);
+            }
+
+
             if (Directory.Exists(path))
             {
                 DialogResult dialogResult = MessageBox.Show("Are you sure you want to delete '" + path + "' and all its contents?", "Confirm deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);

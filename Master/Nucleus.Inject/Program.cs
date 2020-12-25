@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Collections;
+using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
 using System.Threading;
+using Microsoft.Win32;
 using Nucleus.Gaming;
 
 namespace Nucleus.Inject
@@ -100,7 +104,19 @@ namespace Nucleus.Inject
 			}
 			else if (tier == 1)
 			{
+				try
+				{
+
+				
 				RuntimeHook(argsDecoded, i, is64);
+				}
+				catch (
+					Exception
+				e)
+				{
+					Log("error = " + e);
+					throw;
+				}
 			}
 		}
 
@@ -137,20 +153,35 @@ namespace Nucleus.Inject
 			{
 				Log("Setting up Nucleus environment");
 
+				string NucleusEnvironmentRoot = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+				string DocumentsRoot = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
 				IDictionary envVars = Environment.GetEnvironmentVariables();
 				var sb = new StringBuilder();
-				var username = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).Replace(@"C:\Users\", "");
-				envVars["USERPROFILE"] = $@"C:\Users\{username}\NucleusCoop\{playerNick}";
+				//var username = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).Replace(@"C:\Users\", "");
+				string username = WindowsIdentity.GetCurrent().Name.Split('\\')[1];
+				envVars["USERPROFILE"] = $@"{NucleusEnvironmentRoot}\NucleusCoop\{playerNick}";
 				envVars["HOMEPATH"] = $@"\Users\{username}\NucleusCoop\{playerNick}";
-				envVars["APPDATA"] = $@"C:\Users\{username}\NucleusCoop\{playerNick}\AppData\Roaming";
-				envVars["LOCALAPPDATA"] = $@"C:\Users\{username}\NucleusCoop\{playerNick}\AppData\Local";
+				envVars["APPDATA"] = $@"{NucleusEnvironmentRoot}\NucleusCoop\{playerNick}\AppData\Roaming";
+				envVars["LOCALAPPDATA"] = $@"{NucleusEnvironmentRoot}\NucleusCoop\{playerNick}\AppData\Local";
 
 				//Some games will crash if the directories don't exist
-				Directory.CreateDirectory($@"C:\Users\{username}\NucleusCoop");
+				Directory.CreateDirectory($@"{NucleusEnvironmentRoot}\NucleusCoop");
 				Directory.CreateDirectory(envVars["USERPROFILE"].ToString());
 				Directory.CreateDirectory(Path.Combine(envVars["USERPROFILE"].ToString(), "Documents"));
 				Directory.CreateDirectory(envVars["APPDATA"].ToString());
 				Directory.CreateDirectory(envVars["LOCALAPPDATA"].ToString());
+
+				Directory.CreateDirectory(Path.GetDirectoryName(DocumentsRoot) + $@"\NucleusCoop\{playerNick}\Documents");
+
+				if (!File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), @"utils\backup\User Shell Folders.reg")))
+				{
+					//string mydocPath = key.GetValue("Personal").ToString();
+					ExportRegistry(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), @"utils\backup\User Shell Folders.reg"));
+				}
+
+				RegistryKey dkey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", true);
+				dkey.SetValue("Personal", Path.GetDirectoryName(DocumentsRoot) + $@"\NucleusCoop\{playerNick}\Documents", (RegistryValueKind)(int)RegType.ExpandString);
 
 				foreach (object envVarKey in envVars.Keys)
 				{
@@ -351,6 +382,8 @@ namespace Nucleus.Inject
 			int.TryParse(args[i++], out int posx);
 			int.TryParse(args[i++], out int posy);
 
+			int.TryParse(args[i++], out int controllerIndex);
+
 			bool.TryParse(args[i++], out bool setCursorPos);
 			bool.TryParse(args[i++], out bool getCursorPos);
 			bool.TryParse(args[i++], out bool getKeyState);
@@ -364,6 +397,8 @@ namespace Nucleus.Inject
 			bool.TryParse(args[i++], out bool reRegisterRawInput);
 			bool.TryParse(args[i++], out bool reRegisterRawInputMouse);
 			bool.TryParse(args[i++], out bool reRegisterRawInputKeyboard);
+			bool.TryParse(args[i++], out bool hookXinput);
+			bool.TryParse(args[i++], out bool dinputToXinputTranslation);
 
 			string writePipeName = args[i++];
 			string readPipeName = args[i++];
@@ -381,7 +416,7 @@ namespace Nucleus.Inject
 			var readPipeNameBytes = Encoding.Unicode.GetBytes(readPipeName);
 			int readPipeNameLength = readPipeNameBytes.Length;
 
-			int size = 58 + logPathLength + writePipeNameLength + readPipeNameLength;
+			int size = 256 + logPathLength + writePipeNameLength + readPipeNameLength;
 			IntPtr intPtr = Marshal.AllocHGlobal(size);
 			byte[] dataToSend = new byte[size];
 
@@ -421,6 +456,8 @@ namespace Nucleus.Inject
 			dataToSend[index++] = Bool_1_0(reRegisterRawInput);
 			dataToSend[index++] = Bool_1_0(reRegisterRawInputMouse);
 			dataToSend[index++] = Bool_1_0(reRegisterRawInputKeyboard);
+			dataToSend[index++] = Bool_1_0(hookXinput);
+			dataToSend[index++] = Bool_1_0(dinputToXinputTranslation);
 
 			dataToSend[index++] = (byte) (logPathLength >> 24);
 			dataToSend[index++] = (byte) (logPathLength >> 16);
@@ -457,6 +494,11 @@ namespace Nucleus.Inject
 			dataToSend[index++] = (byte)(posy >> 8);
 			dataToSend[index++] = (byte)posy;
 
+			dataToSend[index++] = (byte)(controllerIndex >> 24);
+			dataToSend[index++] = (byte)(controllerIndex >> 16);
+			dataToSend[index++] = (byte)(controllerIndex >> 8);
+			dataToSend[index++] = (byte)controllerIndex;
+
 			Array.Copy(logPath, 0, dataToSend, index, logPathLength);
 			Array.Copy(writePipeNameBytes, 0, dataToSend, index + logPathLength, writePipeNameLength);
 			Array.Copy(readPipeNameBytes, 0, dataToSend, index + logPathLength + writePipeNameLength,
@@ -480,6 +522,30 @@ namespace Nucleus.Inject
 			catch (Exception ex)
 			{
 				Log("ERROR - " + ex.Message);
+			}
+		}
+
+		private static void ExportRegistry(string strKey, string filepath)
+		{
+			try
+			{
+				using (Process proc = new Process())
+				{
+					proc.StartInfo.FileName = "reg.exe";
+					proc.StartInfo.UseShellExecute = false;
+					proc.StartInfo.RedirectStandardOutput = true;
+					proc.StartInfo.RedirectStandardError = true;
+					proc.StartInfo.CreateNoWindow = true;
+					proc.StartInfo.Arguments = "export \"" + strKey + "\" \"" + filepath + "\" /y";
+					proc.Start();
+					string stdout = proc.StandardOutput.ReadToEnd();
+					string stderr = proc.StandardError.ReadToEnd();
+					proc.WaitForExit();
+				}
+			}
+			catch (Exception ex)
+			{
+				// handle exception
 			}
 		}
 	}

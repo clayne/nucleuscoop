@@ -5,17 +5,17 @@
 
 HWND WINAPI GetForegroundWindow_Hook()
 {
-	return hWnd;
+	return Globals::hWnd;
 }
 
 HWND WINAPI WindowFromPoint_Hook(POINT Point)
 {
-	return hWnd;
+	return Globals::hWnd;
 }
 
 HWND WINAPI GetActiveWindow_Hook()
 {
-	return hWnd;
+	return Globals::hWnd;
 }
 
 BOOL WINAPI IsWindowEnabled_Hook(HWND hWnd)
@@ -25,12 +25,12 @@ BOOL WINAPI IsWindowEnabled_Hook(HWND hWnd)
 
 HWND WINAPI GetFocus_Hook()
 {
-	return hWnd;
+	return Globals::hWnd;
 }
 
 HWND WINAPI GetCapture_Hook()
 {
-	return hWnd;
+	return Globals::hWnd;
 }
 
 HWND WINAPI SetCapture_Hook(HWND inputHwnd)
@@ -58,6 +58,13 @@ HWND WINAPI SetFocus_Hook(
 	return input;
 }
 
+BOOL WINAPI SetForegroundWindow_Hook(
+	HWND hWnd
+)
+{
+	return true;
+}
+
 void installFocusHooks()
 {
 	DEBUGLOG("Injecting Focus hooks\n");
@@ -71,4 +78,6 @@ void installFocusHooks()
 	installHook("user32", "ReleaseCapture", ReleaseCapture_Hook);
 	installHook("user32", "SetActiveWindow", SetActiveWindow_Hook);
 	installHook("user32", "SetFocus", SetFocus_Hook);
+
+	installHook("user32", "SetForegroundWindow", SetForegroundWindow_Hook);
 }

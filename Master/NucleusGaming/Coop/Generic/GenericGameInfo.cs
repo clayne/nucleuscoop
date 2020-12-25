@@ -55,6 +55,7 @@ namespace Nucleus.Gaming
         public bool FakeFocus;
         public int FakeFocusInterval = 1000;//TODO: high CPU usage with low value?
         public bool FakeFocusSendActivate = true;
+        public bool SendFakeFocusMsg;
 
 
 		public void AddOption(string name, string desc, string key, object value, object defaultValue)
@@ -201,7 +202,63 @@ namespace Nucleus.Gaming
         public bool UserProfileConfigPathNoCopy;
         public bool UserProfileSavePathNoCopy;
         public bool LauncherExeIgnoreFileCheck;
-
+        public bool ForceBindIPDelay;
+        public string[] CustomUserGeneralPrompts;
+        public bool SaveCustomUserGeneralValues;
+        public string[] CustomUserPlayerPrompts;
+        public bool SaveCustomUserPlayerValues;
+        public string[] CustomUserInstancePrompts;
+        public bool SaveCustomUserInstanceValues;
+        public bool SaveAndEditCustomUserGeneralValues;
+        public bool SaveAndEditCustomUserPlayerValues;
+        public bool SaveAndEditCustomUserInstanceValues;
+        public bool TransferNucleusUserAccountProfiles;
+        public bool UseCurrentUserEnvironment = false;
+        public bool EnableWindows;
+        public string[] WindowStyleEndChanges;
+        public string[] ExtWindowStyleEndChanges;
+        public bool UseDInputBlocker;
+        public bool IgnoreThirdPartyPrompt;
+        public string ExecutableToLaunch;
+        public bool GoldbergWriteSteamIDAndAccount;
+        public bool ForceProcessSearch;
+        public bool IgnoreWindowBorderCheck;
+        public string WriteToProcessMemory;
+        public bool UseNemirtingasEpicEmu;
+        public bool EpicEmuArgs;
+        public bool PromptAfterFirstInstance;
+        public bool FakeFocusSendActivateIgnoreKB;
+        public string[] CopyEnvFoldersToNucleusAccounts;
+        public string[] CopyFoldersTo;
+        public string[] SymlinkFoldersTo;
+        public string[] HardlinkFoldersTo;
+        public bool GamePlayBeforeGameSetup;
+        public bool RequiresAdmin;
+        public int PauseCMDBatchBefore;
+        public int PauseCMDBatchAfter;
+        public bool DontRemoveBorders;
+        public string[] KillMutexProcess;
+        public string MutexProcessExe;
+        public bool PartialMutexSearchProcess;
+        public string KillMutexTypeProcess = "Mutant";
+        public bool GoldbergExperimentalSteamClient;
+        public int PauseBeforeMutexKilling;
+        public int KillMutexDelayProcess;
+        public bool GoldbergIgnoreFileCheck;
+        public bool XInputPlusNoIni;
+        public string DocumentsConfigPath;
+        public string DocumentsSavePath;
+        public bool ForceDocumentsConfigCopy;
+        public bool ForceDocumentsSaveCopy;
+        public bool DocumentsConfigPathNoCopy;
+        public bool DocumentsSavePathNoCopy;
+        public string FlawlessWidescreenPluginPath;
+        public bool XInputPlusOldDll;
+        public bool FlawlessWidescreenOverrideDisplay;
+        public string[] CMDBatchClose;
+        public string ForceGameArch;
+        public string[] SSEAdditionalLines;
+        public string[] DeleteOnClose;
 
         // -- From USS
         //Effectively a switch for all of USS features
@@ -221,6 +278,8 @@ namespace Nucleus.Gaming
 		public bool HookReRegisterRawInput = false;
 		public bool HookReRegisterRawInputMouse = true;
 		public bool HookReRegisterRawInputKeyboard = true;
+		public bool InjectHookXinput = false;
+		public bool InjectDinputToXinputTranslation = false;
 
 		//Not hooks
 		public bool SendNormalMouseInput = true;
