@@ -62,9 +62,10 @@ namespace StartGame
         private static bool useNucleusEnvironment;
         private static bool injectFailed;
         private static bool useStartupHooks = true;
+        private static bool useDocs;
 
         private static string NucleusEnvironmentRoot = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        private static string DocumentsRoot = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        private static string DocumentsRoot;// = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
         private static int width;
         private static int height;
@@ -301,14 +302,18 @@ namespace StartGame
 
                     Directory.CreateDirectory(Path.GetDirectoryName(DocumentsRoot) + $@"\NucleusCoop\{playerNick}\Documents");
 
-                    if (!File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), @"utils\backup\User Shell Folders.reg")))
+                    if(useDocs)
                     {
-                        //string mydocPath = key.GetValue("Personal").ToString();
-                        ExportRegistry(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), @"utils\backup\User Shell Folders.reg"));
+                        if (!File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), @"utils\backup\User Shell Folders.reg")))
+                        {
+                            //string mydocPath = key.GetValue("Personal").ToString();
+                            ExportRegistry(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), @"utils\backup\User Shell Folders.reg"));
+                        }
+
+                        RegistryKey dkey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", true);
+                        dkey.SetValue("Personal", Path.GetDirectoryName(DocumentsRoot) + $@"\NucleusCoop\{playerNick}\Documents", (RegistryValueKind)(int)RegType.ExpandString);
                     }
 
-                    RegistryKey dkey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", true);
-                    dkey.SetValue("Personal", Path.GetDirectoryName(DocumentsRoot) + $@"\NucleusCoop\{playerNick}\Documents", (RegistryValueKind)(int)RegType.ExpandString);
 
                     foreach (object envVarKey in envVars.Keys)
                     {
@@ -415,7 +420,9 @@ namespace StartGame
                             width,
                             height,
                             posx,
-                            posy
+                            posy,
+                            DocumentsRoot,
+                            useDocs
                             };
 
                             var sbArgs = new StringBuilder();
@@ -697,6 +704,8 @@ namespace StartGame
                              //&& !skey.Contains("rawhid")
                              && !skey.Contains("createsingle")
                              && !skey.Contains("rawhid")
+                             && !skey.Contains("docpath")
+                             && !skey.Contains("usedocs")
                              && !skey.Contains("output"))
                              
                                                           
@@ -764,6 +773,14 @@ namespace StartGame
                     {
                         posy = Int32.Parse(splited[1]);
                     }
+                    else if (key.Contains("docpath"))
+                    {
+                        DocumentsRoot = splited[1];
+                    }
+                    else if (key.Contains("usedocs"))
+                    {
+                        useDocs = Boolean.Parse(splited[1]);
+                    }
                     else if (key.Contains("isdebug"))
                     {
                         isDebug = Boolean.Parse(splited[1]);
@@ -806,7 +823,7 @@ namespace StartGame
                     }
                     else if (key.Contains("destination"))
                     {
-                        destination = splited[1].Substring(0,splited[1].LastIndexOf('\\'));
+                        destination = splited[1].Substring(0, splited[1].LastIndexOf('\\'));
                     }
                     else if (key.Contains("direxclusions"))
                     {
@@ -830,7 +847,7 @@ namespace StartGame
                     }
                     else if (key.Contains("numplayers"))
                     {
-                         numPlayers = int.Parse(splited[1]);
+                        numPlayers = int.Parse(splited[1]);
                     }
                     else if (key.Contains("symlink"))
                     {
@@ -874,7 +891,7 @@ namespace StartGame
                     }
                     else if (key.Contains("mutex"))
                     {
-                        string[] mutex = splited[1].Split(new string[] { "|==|"}, StringSplitOptions.None );
+                        string[] mutex = splited[1].Split(new string[] { "|==|" }, StringSplitOptions.None);
                         ConsoleU.WriteLine("Trying to kill mutexes", Palette.Wait);
                         for (int j = 0; j < mutex.Length; j++)
                         {
@@ -921,7 +938,7 @@ namespace StartGame
                             {
                                 all = false;
                             }
-                            
+
                             Thread.Sleep(500);
                         }
                         Console.WriteLine(all.ToString());
